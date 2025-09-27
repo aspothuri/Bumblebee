@@ -34,6 +34,7 @@ router.get('/', async (req, res) => {
 
 const { generateTagsFromDescription } = require('../utils/tagging.js');
 const Tag = require('../models/Tag');
+const { getCompatibleUsers } = require('../utils/compatibility');
 
 // post new profiles
 router.post('/:userId', async (req, res) => {
@@ -74,6 +75,16 @@ router.post('/:userId', async (req, res) => {
         res.status(400).json({ message: err.message });
     }
 });
+
+router.get('/:userId/compatibility', async (req, res) => {
+  try {
+    const sortedUsers = await getCompatibleUsers(req.params.userId);
+    res.json(sortedUsers); // returns array of { userId, compatibility }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 
 module.exports = router;
