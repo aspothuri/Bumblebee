@@ -11,6 +11,12 @@ const profile = new mongoose.Schema({
     type: String,
     default: 'https://placehold.co/400x400',
   },
+  age: {
+    type: Number,
+    min: 18,
+    max: 50,
+    default: 18
+  },
   description: {
     type: String,
     trim: true,

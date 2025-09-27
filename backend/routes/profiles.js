@@ -5,8 +5,13 @@ const Profile = require('../models/Profile');
 // get all profiles
 router.get('/', async (req, res) => {
     console.log('Received Query:', req.query);
+    const {searchUserId} = req.query;
+    const filter = {};
+    if (searchUserId) {
+      filter.user = searchUserId;
+    }
     try {
-        const profiles = await Profile.find().select('user profileImage, description');
+        const profiles = await Profile.find(filter).select('user profileImage description');
 
         const profileTuples = profiles.map(profileDoc => {
             const userId = profileDoc.user ? profileDoc.user.toString() : 'UNKNOWN_USER'; 
@@ -14,6 +19,7 @@ router.get('/', async (req, res) => {
             const tuple = [
                 userId,
                 profileDoc.profileImage || '',
+                profileDoc.age || '',
                 profileDoc.description || ''
             ];
             return tuple;
@@ -31,12 +37,14 @@ router.post('/:userId', async (req, res) => {
     const userId = req.params.userId; 
     const {
     profileImage,
+    age,
     Description
 } = req.body;
     
     const newProfile = new Profile({
         user: userId, 
         profileImage,
+        age,
         Description
     });
 
