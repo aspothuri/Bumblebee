@@ -1,0 +1,51 @@
+.bb-header {
+  width: 100vw;
+  background: linear-gradient(90deg, #000 0%, #ffeb3b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  height: 70px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+.bb-logo-link {
+  color: #000;
+  font-size: 2rem;
+  font-weight: bold;
+  text-decoration: none;
+  letter-spacing: 2px;
+  background: #ffeb3b;
+  padding: 8px 18px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(255,235,59,0.15);
+  transition: background 0.2s;
+}
+
+.bb-logo-link:hover {
+  background: #fffde7;
+}
+
+.bb-nav {
+  display: flex;
+  gap: 30px;
+}
+
+.bb-nav-link {
+  color: #ffeb3b;
+  font-weight: bold;
+  font-size: 1.1rem;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.bb-nav-link:hover {
+  background: #ffeb3b;
+  color: #000;
+}
