@@ -32,6 +32,10 @@ router.get('/', async (req, res) => {
     }
 });
 
+const { generateTagsFromDescription } = require('../utils/tagging.js');
+const Tag = require('../models/Tag');
+const { getCompatibleUsers } = require('../utils/compatibility');
+
 // post new profiles
 router.post('/:userId', async (req, res) => {
     const userId = req.params.userId; 
@@ -49,11 +53,38 @@ router.post('/:userId', async (req, res) => {
     });
 
     try {
+        // Step 1: save the profile
         const savedProfile = await newProfile.save();
-        res.status(201).json(savedProfile);
+
+        // Step 2: generate tags from description
+        let tags = {};
+        if (description) {
+            tags = await generateTagsFromDescription(description);
+        }
+
+        // Step 3: save tags to DB if valid
+        let savedTagSet = null;
+        if (tags) {
+            savedTagSet = await new Tag({ user: userId, ...tags }).save();
+        }
+
+        // Step 4: respond with both profile + tags
+        res.status(201).json({ profile: savedProfile, tags: savedTagSet });
     } catch (err) {
+        console.error(err);
         res.status(400).json({ message: err.message });
     }
 });
+
+router.get('/:userId/compatibility', async (req, res) => {
+  try {
+    const sortedUsers = await getCompatibleUsers(req.params.userId);
+    res.json(sortedUsers); // returns array of { userId, compatibility }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
 
 module.exports = router;
