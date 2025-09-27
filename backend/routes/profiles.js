@@ -6,7 +6,7 @@ const Profile = require('../models/Profile');
 router.get('/', async (req, res) => {
     console.log('Received Query:', req.query);
     try {
-        const profiles = await Profile.find().select('user profileImage, description');
+        const profiles = await Profile.find().select('user profileImage description');
 
         const profileTuples = profiles.map(profileDoc => {
             const userId = profileDoc.user ? profileDoc.user.toString() : 'UNKNOWN_USER'; 
@@ -26,26 +26,46 @@ router.get('/', async (req, res) => {
     }
 });
 
+const { generateTagsFromDescription } = require('../utils/tagging.js');
+const Tag = require('../models/Tag');
+
 // post new profiles
 router.post('/:userId', async (req, res) => {
     const userId = req.params.userId; 
     const {
-    profileImage,
-    Description
-} = req.body;
+        profileImage,
+        description // lowercase to match your schema
+    } = req.body;
     
     const newProfile = new Profile({
         user: userId, 
         profileImage,
-        Description
+        description
     });
 
     try {
+        // Step 1: save the profile
         const savedProfile = await newProfile.save();
-        res.status(201).json(savedProfile);
+
+        // Step 2: generate tags from description
+        let tags = {};
+        if (description) {
+            tags = await generateTagsFromDescription(description);
+        }
+
+        // Step 3: save tags to DB if valid
+        let savedTagSet = null;
+        if (tags) {
+            savedTagSet = await new Tag({ user: userId, ...tags }).save();
+        }
+
+        // Step 4: respond with both profile + tags
+        res.status(201).json({ profile: savedProfile, tags: savedTagSet });
     } catch (err) {
+        console.error(err);
         res.status(400).json({ message: err.message });
     }
 });
+
 
 module.exports = router;
