@@ -1,66 +1,149 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { colonies } from '../../data/data.js';
 import './Feed.css';
 
 const Feed = ({ onSaveMatch, currentColony }) => {
   const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
+  const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
 
   const currentProfile = profiles[currentProfileIndex];
+
+  // Add debugging at component level
+  useEffect(() => {
+    console.log('Feed: Component mounted');
+    console.log('Feed: Session storage contents:');
+    console.log('- currentUserId:', sessionStorage.getItem('currentUserId'));
+    console.log('- userName:', sessionStorage.getItem('userName'));
+    console.log('- currentUserEmail:', sessionStorage.getItem('currentUserEmail'));
+  }, []);
+
+  // Colony definitions inline
+  const colonies = {
+    honeycomb: { name: "Honeycomb Heights", color: "#ffc107", unlocked: true, cost: 0 },
+    meadow: { name: "Meadow Fields", color: "#4caf50", unlocked: false, cost: 15 },
+    sunset: { name: "Sunset Valley", color: "#ff9800", unlocked: false, cost: 20 },
+    crystal: { name: "Crystal Gardens", color: "#2196f3", unlocked: false, cost: 25 },
+    forest: { name: "Whispering Woods", color: "#795548", unlocked: false, cost: 30 },
+    ocean: { name: "Ocean Breeze", color: "#00bcd4", unlocked: false, cost: 35 }
+  };
 
   // Fetch compatible users from backend
   useEffect(() => {
     const fetchCompatibleUsers = async () => {
-      if (!currentUserId) return;
+      console.log('Feed: Starting fetchCompatibleUsers...');
+      console.log('Feed: currentUserId state:', currentUserId);
+      console.log('Feed: currentUserId from session:', sessionStorage.getItem('currentUserId'));
+
+      if (!currentUserId) {
+        console.log('Feed: No currentUserId found - user may not be logged in');
+        setLoading(false);
+        return;
+      }
       
+      console.log('Feed: Starting fetch for currentUserId:', currentUserId);
       setLoading(true);
       try {
-        // Get compatible users based on user's tags
-        const response = await axios.get(`http://localhost:3000/profiles/${currentUserId}/compatibility`);
+        let fetchedProfiles = [];
         
-        if (response.data && response.data.length > 0) {
-          // Fetch full profile data for compatible users
-          const profilePromises = response.data.slice(0, 10).map(async (compatibleUser) => {
-            try {
-              const profileResponse = await axios.get('http://localhost:3000/profiles', {
-                params: { searchUserId: compatibleUser.userId }
-              });
-              
-              if (profileResponse.data && profileResponse.data.length > 0) {
-                const profileData = profileResponse.data[0];
-                // Convert backend format to frontend format
-                return {
-                  id: compatibleUser.userId,
-                  name: `User ${compatibleUser.userId}`, // Would need to get actual name from users table
-                  age: profileData[2] || 25,
-                  bio: profileData[3] || 'Looking for meaningful connections!',
-                  location: 'City, State', // Would need location from backend
-                  colony: currentColony,
-                  photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
-                  occupation: 'Professional',
-                  education: 'University',
-                  height: '5\'10"',
-                  interests: ['Technology', 'Music', 'Travel'],
-                  compatibility: compatibleUser.compatibility
-                };
+        // First try to get compatible users
+        try {
+          console.log('Feed: Attempting compatibility API call...');
+          const compatibilityResponse = await axios.get(`http://localhost:3000/profiles/${currentUserId}/compatibility`);
+          console.log('Feed: Compatibility response:', compatibilityResponse.data);
+          
+          if (compatibilityResponse.data && compatibilityResponse.data.length > 0) {
+            console.log('Feed: Found compatible users:', compatibilityResponse.data.length);
+            
+            // Fetch full profile data for compatible users
+            const profilePromises = compatibilityResponse.data.slice(0, 10).map(async (compatibleUser) => {
+              try {
+                console.log('Feed: Fetching profile for compatible user:', compatibleUser.userId);
+                const profileResponse = await axios.get('http://localhost:3000/profiles', {
+                  params: { searchUserId: compatibleUser.userId }
+                });
+                
+                if (profileResponse.data && profileResponse.data.length > 0) {
+                  const profileData = profileResponse.data[0];
+                  return {
+                    id: compatibleUser.userId,
+                    name: profileData[4] || `User ${compatibleUser.userId}`,
+                    age: profileData[2] || 25,
+                    bio: profileData[3] || 'Looking for meaningful connections!',
+                    location: profileData[6] || 'City, State',
+                    colony: currentColony,
+                    photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
+                    occupation: 'Professional',
+                    education: 'University',
+                    height: '5\'10"',
+                    interests: ['Technology', 'Music', 'Travel'],
+                    compatibility: compatibleUser.compatibility
+                  };
+                }
+                return null;
+              } catch (error) {
+                console.error('Error fetching profile for user:', compatibleUser.userId, error);
+                return null;
               }
-              return null;
-            } catch (error) {
-              console.error('Error fetching profile for user:', compatibleUser.userId, error);
-              return null;
-            }
-          });
+            });
 
-          const fetchedProfiles = await Promise.all(profilePromises);
-          const validProfiles = fetchedProfiles.filter(profile => profile !== null);
-          setProfiles(validProfiles);
+            const compatibleProfiles = await Promise.all(profilePromises);
+            fetchedProfiles = compatibleProfiles.filter(profile => profile !== null);
+          } else {
+            console.log('Feed: No compatible users found in response');
+          }
+        } catch (compatibilityError) {
+          console.log('Feed: Compatibility endpoint failed:', compatibilityError.response?.status, compatibilityError.message);
         }
+        
+        // If no compatible users found, fetch all profiles as fallback
+        if (fetchedProfiles.length === 0) {
+          console.log('Feed: Fetching all profiles as fallback...');
+          
+          try {
+            const allProfilesResponse = await axios.get('http://localhost:3000/profiles');
+            console.log('Feed: All profiles response:', allProfilesResponse.data?.length || 0, 'profiles found');
+            
+            if (allProfilesResponse.data && allProfilesResponse.data.length > 0) {
+              // Filter out current user and format profiles
+              const profilePromises = allProfilesResponse.data
+                .filter(profile => {
+                  const isCurrentUser = profile[0] === currentUserId;
+                  console.log('Feed: Profile', profile[0], 'is current user?', isCurrentUser);
+                  return !isCurrentUser;
+                })
+                .slice(0, 10)
+                .map(async (profileData) => {
+                  return {
+                    id: profileData[0],
+                    name: profileData[4] || profileData[0],
+                    age: profileData[2] || 25,
+                    bio: profileData[3] || 'Looking for meaningful connections!',
+                    location: profileData[6] || 'City, State',
+                    colony: currentColony,
+                    photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
+                    occupation: 'Professional',
+                    education: 'University',
+                    height: '5\'10"',
+                    interests: ['Technology', 'Music', 'Travel'],
+                    compatibility: Math.floor(Math.random() * 40) + 60
+                  };
+                });
+
+              const allProfiles = await Promise.all(profilePromises);
+              fetchedProfiles = allProfiles.filter(profile => profile !== null);
+            }
+          } catch (allProfilesError) {
+            console.error('Feed: Failed to fetch all profiles:', allProfilesError);
+          }
+        }
+        
+        console.log('Feed: Final fetched profiles:', fetchedProfiles.length);
+        setProfiles(fetchedProfiles);
+        
       } catch (error) {
         console.error('Error fetching compatible users:', error);
-        // Fallback to empty profiles array
         setProfiles([]);
       } finally {
         setLoading(false);
@@ -106,8 +189,23 @@ const Feed = ({ onSaveMatch, currentColony }) => {
       <div className="feed-container">
         <div className="no-profiles">
           <div className="no-profiles-icon">🐝</div>
-          <h2>No compatible profiles found!</h2>
-          <p>Complete your profile to get better matches.</p>
+          <h2>No profiles available!</h2>
+          <p>There are no other users to show right now.</p>
+          <p>Current User ID: {currentUserId}</p>
+          <p>Try creating more user accounts or check the database.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            style={{ 
+              padding: '10px 20px', 
+              marginTop: '10px',
+              backgroundColor: '#ffc107',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            🔄 Refresh
+          </button>
         </div>
       </div>
     );
@@ -199,6 +297,5 @@ const Feed = ({ onSaveMatch, currentColony }) => {
     </div>
   );
 };
-
 
 export default Feed;

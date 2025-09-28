@@ -26,28 +26,47 @@ function simscore(currentVec, otherVec) {
 
 // Main function: get compatible users
 async function getCompatibleUsers(userId) {
-  // 1️⃣ Get current user tags
-  const currentUserTags = await Tag.findOne({ user: userId });
-  if (!currentUserTags) throw new Error("User tags not found");
+  try {
+    console.log('Compatibility: Finding compatible users for:', userId);
+    
+    // 1️⃣ Get current user tags
+    const currentUserTags = await Tag.findOne({ user: userId });
+    if (!currentUserTags) {
+      console.log('Compatibility: No tags found for user:', userId);
+      throw new Error("User tags not found");
+    }
 
-  const currentVector = tagDocToVector(currentUserTags);
+    const currentVector = tagDocToVector(currentUserTags);
+    console.log('Compatibility: Current user vector generated');
 
-  // 2️⃣ Get all other users
-  const allTags = await Tag.find({ user: { $ne: userId } });
+    // 2️⃣ Get all other users
+    const allTags = await Tag.find({ user: { $ne: userId } });
+    console.log('Compatibility: Found', allTags.length, 'other users with tags');
 
-  // 3️⃣ Compute similarity for each
-  const scoredUsers = allTags.map(tagDoc => {
-    const vector = tagDocToVector(tagDoc);
-    return {
-      userId: tagDoc.user.toString(),
-      compatibility: simscore(currentVector, vector)
-    };
-  });
+    if (allTags.length === 0) {
+      console.log('Compatibility: No other users found with tags');
+      return [];
+    }
 
-  // 4️⃣ Sort descending
-  scoredUsers.sort((a, b) => b.compatibility - a.compatibility);
+    // 3️⃣ Compute similarity for each
+    const scoredUsers = allTags.map(tagDoc => {
+      const vector = tagDocToVector(tagDoc);
+      const compatibility = simscore(currentVector, vector);
+      return {
+        userId: tagDoc.user.toString(),
+        compatibility: Math.max(0, Math.min(100, compatibility)) // Ensure 0-100 range
+      };
+    });
 
-  return scoredUsers; // array of {userId, compatibility}
+    // 4️⃣ Sort descending
+    scoredUsers.sort((a, b) => b.compatibility - a.compatibility);
+    
+    console.log('Compatibility: Returning', scoredUsers.length, 'compatible users');
+    return scoredUsers; // array of {userId, compatibility}
+  } catch (error) {
+    console.error('Error in getCompatibleUsers:', error);
+    throw error;
+  }
 }
 
 module.exports = { getCompatibleUsers };

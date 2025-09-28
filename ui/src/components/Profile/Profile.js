@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { colonies } from '../../data/data.js';
+import { colonies, profileAPI, utils } from '../../services/api';
 import './Profile.css';
 
 const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) => {
@@ -15,6 +15,7 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
     description: localStorage.getItem('userDescription') || 'Love exploring new places and meeting new people!',
     interests: JSON.parse(localStorage.getItem('userInterests') || '["Travel", "Photography", "Coffee"]')
   });
+  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
 
   useEffect(() => {
     setPreviewImage(userProfilePicture);
@@ -37,7 +38,7 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
       }
 
       setError('');
-      
+
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviewImage(e.target.result);
@@ -63,15 +64,37 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
     setShowPhotoUpload(false);
   };
 
-  const handleSaveProfile = () => {
-    // Save to localStorage for demo purposes
-    localStorage.setItem('userName', profileData.name);
-    localStorage.setItem('userEmail', profileData.email);
-    localStorage.setItem('userAge', profileData.age);
-    localStorage.setItem('userLocation', profileData.location);
-    localStorage.setItem('userDescription', profileData.description);
-    localStorage.setItem('userInterests', JSON.stringify(profileData.interests));
-    setIsEditing(false);
+  const handleSaveProfile = async () => {
+    try {
+      // Save to backend
+      if (currentUserId) {
+        const result = await profileAPI.createProfile(currentUserId, {
+          profileImage: previewImage,
+          age: parseInt(profileData.age),
+          Description: profileData.description
+        });
+
+        if (result.success) {
+          // Save to localStorage for immediate UI updates
+          utils.setCurrentUser({
+            id: currentUserId,
+            username: profileData.email,
+            name: profileData.name,
+            age: profileData.age,
+            location: profileData.location,
+            description: profileData.description,
+            interests: profileData.interests,
+            profilePicture: previewImage
+          });
+
+          setIsEditing(false);
+        } else {
+          console.error('Failed to save profile:', result.message);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    }
   };
 
   const handleInputChange = (field, value) => {
@@ -82,7 +105,7 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
     <div className="profile-container">
       <div className="profile-header">
         <h2 className="profile-title">My Profile</h2>
-        <button 
+        <button
           className="edit-profile-btn"
           onClick={() => setIsEditing(!isEditing)}
         >
@@ -102,8 +125,8 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
               </div>
             )}
           </div>
-          
-          <button 
+
+          <button
             className="change-photo-btn"
             onClick={() => setShowPhotoUpload(true)}
           >
@@ -220,7 +243,7 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
               <h3>Change Profile Photo</h3>
               <button className="close-btn" onClick={handleCancelPhoto}>✕</button>
             </div>
-            
+
             <div className="modal-content">
               <div className="photo-preview">
                 {previewImage ? (
@@ -232,7 +255,7 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
                   </div>
                 )}
               </div>
-              
+
               <div className="upload-actions">
                 <input
                   type="file"
@@ -244,17 +267,17 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
                 <label htmlFor="photoUpload" className="upload-btn">
                   📷 Choose Photo
                 </label>
-                
+
                 {previewImage && (
                   <button className="remove-photo-btn" onClick={handleRemovePhoto}>
                     🗑️ Remove Photo
                   </button>
                 )}
               </div>
-              
+
               {error && <div className="error-message">{error}</div>}
             </div>
-            
+
             <div className="modal-footer">
               <button className="cancel-btn" onClick={handleCancelPhoto}>Cancel</button>
               <button className="save-photo-btn" onClick={handleSavePhoto}>Save Photo</button>

@@ -21,8 +21,8 @@ function Signup() {
   const [previewImage, setPreviewImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [availableInterests] = useState([
-    'Technology', 'Art', 'Music', 'Sports', 'Travel', 'Cooking', 'Reading', 
-    'Photography', 'Dancing', 'Hiking', 'Gaming', 'Fitness', 'Movies', 
+    'Technology', 'Art', 'Music', 'Sports', 'Travel', 'Cooking', 'Reading',
+    'Photography', 'Dancing', 'Hiking', 'Gaming', 'Fitness', 'Movies',
     'Fashion', 'Food', 'Nature', 'Writing', 'Yoga', 'Adventure', 'Coffee'
   ]);
   const navigate = useNavigate();
@@ -152,58 +152,72 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = validateForm();
-    
+
     if (Object.keys(newErrors).length === 0) {
       setLoading(true);
       try {
         // Step 1: Create user account
+        console.log('Signup: Creating user account...');
         const userResponse = await axios.post('http://localhost:3000/users', {
           username: formData.username,
-          password: formData.password
+          password: formData.password,
+          email: formData.email,
+          name: formData.name,
+          location: formData.location
         });
 
-        if (userResponse.status === 201) {
+        if (userResponse.data && userResponse.data._id) {
           const userId = userResponse.data._id;
+          console.log('Signup: User created with ID:', userId);
 
           // Step 2: Create user profile
           const profileData = {
             profileImage: previewImage || '',
-            age: formData.age,
-            Description: formData.description
+            age: parseInt(formData.age),
+            Description: formData.description,
+            name: formData.name,
+            email: formData.email,
+            location: formData.location
           };
 
-          await axios.post(`http://localhost:3000/profiles/${userId}`, profileData);
+          console.log('Signup: Creating profile...');
+          const profileResponse = await axios.post(`http://localhost:3000/profiles/${userId}`, profileData);
 
-          // Step 3: Store user data locally
-          localStorage.setItem('currentUserId', userId);
-          localStorage.setItem('currentUsername', formData.username); // Changed from currentUserName
-          localStorage.setItem('username', formData.username); // Add this for login compatibility
-          localStorage.setItem('currentUserEmail', formData.email);
-          localStorage.setItem('userName', formData.name);
-          localStorage.setItem('userAge', formData.age);
-          localStorage.setItem('userLocation', formData.location);
-          localStorage.setItem('userDescription', formData.description);
-          localStorage.setItem('userInterests', JSON.stringify(formData.interests));
-          
-          if (previewImage) {
-            localStorage.setItem('userProfilePicture', previewImage);
+          if (profileResponse.data) {
+            console.log('Signup: Profile created successfully');
+
+            // Step 3: Store user data in sessionStorage (same as login)
+            sessionStorage.setItem('currentUserId', userId);
+            sessionStorage.setItem('currentUserEmail', formData.email);
+            sessionStorage.setItem('userName', formData.name);
+            sessionStorage.setItem('userHoney', '10');
+            sessionStorage.setItem('userColony', 'honeycomb');
+
+            console.log('Signup successful:', {
+              userId,
+              name: formData.name,
+              username: formData.username,
+              email: formData.email
+            });
+
+            console.log('Session storage after signup:');
+            console.log('- currentUserId:', sessionStorage.getItem('currentUserId'));
+            console.log('- userName:', sessionStorage.getItem('userName'));
+            console.log('- currentUserEmail:', sessionStorage.getItem('currentUserEmail'));
+
+            navigate('/menu');
+          } else {
+            setErrors({ general: 'Profile creation failed. Please try again.' });
           }
-
-          console.log('Signup successful:', {
-            userId,
-            name: formData.name,
-            username: formData.username,
-            email: formData.email
-          });
-          
-          navigate('/menu');
+        } else {
+          setErrors({ general: 'User creation failed. Please try again.' });
         }
       } catch (error) {
         console.error('Signup error:', error);
-        if (error.response?.status === 400 && error.response?.data?.message?.includes('duplicate')) {
+        if (error.response?.data?.message?.includes('duplicate') || error.response?.data?.message?.includes('E11000')) {
           setErrors({ username: 'This username is already taken' });
         } else {
-          setErrors({ general: 'Signup failed. Please try again.' });
+          setErrors({ general: error.response?.data?.message || 'Signup failed. Please try again.' });
         }
       } finally {
         setLoading(false);
@@ -219,7 +233,7 @@ function Signup() {
         <h1 className="signup-title">Join the Hive</h1>
         <form onSubmit={handleSubmit}>
           {errors.general && <div className="error-message">{errors.general}</div>}
-          
+
           {/* Profile Picture Upload */}
           <div className="form-group">
             <label htmlFor="profilePicture">Profile Picture (Optional)</label>

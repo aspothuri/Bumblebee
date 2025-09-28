@@ -11,6 +11,39 @@ const user = new mongoose.Schema({
     type: String,
     required: [true, 'Password is required.'],
   },
+  email: {
+    type: String,
+    required: false,
+    trim: true,
+  },
+  name: {
+    type: String,
+    required: false,
+    trim: true,
+  },
+  location: {
+    type: String,
+    required: false,
+    trim: true,
+  },
+  interests: [{
+    type: String,
+    trim: true,
+  }],
+  honey: {
+    type: Number,
+    default: 10,
+  },
+  currentColony: {
+    type: String,
+    default: 'honeycomb',
+  },
+  unlockedColonies: [{
+    type: String,
+    default: ['honeycomb'],
+  }],
+}, {
+  timestamps: true
 });
 
 const User = mongoose.model('User', user);

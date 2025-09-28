@@ -16,7 +16,7 @@ function Login() {
     setLoading(true);
 
     try {
-      // Check if user exists with given credentials
+      // Query the backend to find user with matching username and password
       const response = await axios.get('http://localhost:3000/users', {
         params: {
           search: username,
@@ -27,17 +27,27 @@ function Login() {
 
       if (response.data && response.data.length > 0) {
         // User found - login successful
-        const userData = response.data[0]; // Full user object with _id
-        localStorage.setItem('currentUserId', userData._id);
-        localStorage.setItem('currentUsername', username);
-        localStorage.setItem('username', username);
+        const userData = response.data[0];
+        
+        // Store user data in sessionStorage
+        sessionStorage.setItem('currentUserId', userData._id);
+        sessionStorage.setItem('currentUserEmail', userData.email || username);
+        sessionStorage.setItem('userName', userData.name || username);
+        sessionStorage.setItem('userHoney', userData.honey || 10);
+        sessionStorage.setItem('userColony', userData.currentColony || 'honeycomb');
+        
+        console.log('Login successful for user:', userData._id);
         navigate('/menu');
       } else {
         setError('Invalid username or password');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError('Login failed. Please try again.');
+      if (error.response?.status === 404) {
+        setError('Invalid username or password');
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

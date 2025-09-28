@@ -6,12 +6,26 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
   const [activeChat, setActiveChat] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState({});
-  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
+  const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
+
+  // Add debugging at component level
+  useEffect(() => {
+    console.log('Messages: Component mounted');
+    console.log('Messages: Session storage contents:');
+    console.log('- currentUserId:', sessionStorage.getItem('currentUserId'));
+    console.log('- userName:', sessionStorage.getItem('userName'));
+    console.log('- currentUserEmail:', sessionStorage.getItem('currentUserEmail'));
+    
+    if (!currentUserId) {
+      console.log('Messages: No currentUserId found - user may not be logged in');
+    }
+  }, []);
 
   // Initialize conversations by fetching from backend
   const initializeConversation = async (userId) => {
     if (!conversations[userId] && currentUserId) {
       try {
+        console.log('Messages: Initializing conversation with user:', userId);
         // Try to get existing chat
         const response = await axios.get('http://localhost:3000/chat', {
           params: {
@@ -20,9 +34,10 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
           }
         });
 
-        if (response.status === 200) {
+        if (response.data) {
+          console.log('Messages: Found existing chat with', response.data.messages?.length || 0, 'messages');
           // Chat exists, format messages
-          const messages = response.data.messages.map((msg, index) => ({
+          const messages = (response.data.messages || []).map((msg, index) => ({
             id: index,
             text: msg[1], // content
             sender: msg[0] === currentUserId ? 'me' : 'them',
@@ -36,13 +51,14 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
         }
       } catch (error) {
         if (error.response?.status === 404) {
+          console.log('Messages: Chat not found, creating new one for user:', userId);
           // Chat doesn't exist, create new one
           try {
             await axios.post('http://localhost:3000/chat', {
               user1Id: currentUserId,
               user2Id: userId
             });
-
+            
             // Initialize with empty conversation
             setConversations(prev => ({
               ...prev,
@@ -50,9 +66,19 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
             }));
           } catch (createError) {
             console.error('Error creating chat:', createError);
+            // Still initialize with empty array as fallback
+            setConversations(prev => ({
+              ...prev,
+              [userId]: []
+            }));
           }
         } else {
-          console.error('Error fetching chat:', error);
+          console.error('Error initializing conversation:', error);
+          // Initialize with empty array as fallback
+          setConversations(prev => ({
+            ...prev,
+            [userId]: []
+          }));
         }
       }
     }
@@ -61,7 +87,7 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
   // Function to fetch new messages from backend
   const fetchNewMessages = async () => {
     if (!activeChat || !currentUserId) return;
-    
+
     try {
       const response = await axios.get('http://localhost:3000/chat', {
         params: {
@@ -70,7 +96,7 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
         }
       });
 
-      if (response.status === 200) {
+      if (response.data && response.data.messages) {
         const messages = response.data.messages.map((msg, index) => ({
           id: index,
           text: msg[1], // content
@@ -95,7 +121,7 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
   // Auto-refresh effect - check for new messages every second
   useEffect(() => {
     let intervalId;
-    
+
     if (activeChat) {
       intervalId = setInterval(() => {
         fetchNewMessages();
@@ -121,16 +147,18 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
     if (!newMessage.trim() || !activeChat || !currentUserId) return;
 
     try {
+      console.log('Messages: Sending message to user:', activeChat.id);
       // First, get the chat to find chatId
-      const chatResponse = await axios.get('http://localhost:3000/chat', {
+      const response = await axios.get('http://localhost:3000/chat', {
         params: {
           user1Id: currentUserId,
           user2Id: activeChat.id
         }
       });
 
-      if (chatResponse.status === 200) {
-        const chatId = chatResponse.data._id;
+      if (response.data) {
+        const chatId = response.data._id;
+        console.log('Messages: Found chat ID:', chatId);
 
         // Send message to backend
         await axios.put(`http://localhost:3000/chat/${chatId}/message`, {
@@ -152,14 +180,30 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
         }));
 
         setNewMessage('');
-        
+
         // Award honey for sending message
         if (onSendMessage) {
           onSendMessage();
         }
+
+        console.log('Messages: Message sent successfully');
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      // Still add to local state for better UX
+      const message = {
+        id: Date.now(),
+        text: newMessage,
+        sender: 'me',
+        timestamp: new Date()
+      };
+
+      setConversations(prev => ({
+        ...prev,
+        [activeChat.id]: [...(prev[activeChat.id] || []), message]
+      }));
+
+      setNewMessage('');
     }
   };
 
@@ -175,7 +219,7 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
 
   if (activeChat) {
     const chatMessages = conversations[activeChat.id] || [];
-    
+
     return (
       <div className="messages-container">
         <div className="chat-header">
@@ -183,8 +227,8 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
             ← Back to Inbox
           </button>
           <div className="chat-user-info" onClick={() => onViewProfile(activeChat)}>
-            <img 
-              src={activeChat.photos[0]} 
+            <img
+              src={activeChat.photos[0]}
               alt={activeChat.name}
               className="chat-avatar"
             />
@@ -201,8 +245,8 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
 
         <div className="chat-messages">
           {chatMessages.map(message => (
-            <div 
-              key={message.id} 
+            <div
+              key={message.id}
               className={`message ${message.sender === 'me' ? 'message-sent' : 'message-received'}`}
             >
               <div className="message-content">
@@ -222,7 +266,7 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
             className="message-input"
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
           />
-          <button 
+          <button
             onClick={handleSendMessage}
             className="send-btn"
             disabled={!newMessage.trim()}
@@ -244,7 +288,7 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
       </div>
 
       <div className="inbox">
-        {savedMatches.length === 0 ? (
+        {!savedMatches || savedMatches.length === 0 ? (
           <div className="empty-inbox">
             <div className="empty-inbox-icon">💌</div>
             <p>No conversations yet!</p>
@@ -253,7 +297,7 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
         ) : (
           <div className="conversations-list">
             {savedMatches.map(match => (
-              <div 
+              <div
                 key={match.id}
                 className="conversation-item"
                 onClick={() => {
@@ -261,8 +305,8 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
                   initializeConversation(match.id);
                 }}
               >
-                <img 
-                  src={match.photos[0]} 
+                <img
+                  src={match.photos[0]}
                   alt={match.name}
                   className="conversation-avatar"
                 />

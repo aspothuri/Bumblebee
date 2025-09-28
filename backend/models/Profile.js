@@ -22,6 +22,42 @@ const profile = new mongoose.Schema({
     trim: true,
     maxlength: [500, 'Description cannot be more than 500 characters.'],
   },
+  name: {
+    type: String,
+    trim: true,
+    required: false,
+  },
+  email: {
+    type: String,
+    trim: true,
+    required: false,
+  },
+  location: {
+    type: String,
+    trim: true,
+    required: false,
+  },
+  occupation: {
+    type: String,
+    trim: true,
+    default: 'Professional',
+  },
+  education: {
+    type: String,
+    trim: true,
+    default: 'University',
+  },
+  height: {
+    type: String,
+    trim: true,
+    default: '5\'10"',
+  },
+  photos: [{
+    type: String,
+    trim: true,
+  }],
+}, {
+  timestamps: true
 });
 
 const Profile = mongoose.model('Profile', profile);

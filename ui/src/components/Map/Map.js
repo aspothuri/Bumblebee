@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { colonies, mapLayout } from '../../data/data.js';
+import { colonies, mapLayout, colonyAPI } from '../../services/api';
 import './Map.css';
 
 const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
@@ -13,6 +13,8 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     forest: false,
     ocean: false,
   });
+  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
+  const [loading, setLoading] = useState(false);
 
   // 🔹 BFS shortest path finder
   const findShortestPath = (start, end) => {
@@ -37,7 +39,32 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     return null;
   };
 
-  const handleColonyClick = (colonyId) => {
+  // Load user's colony status on component mount
+  useEffect(() => {
+    const loadColonyStatus = async () => {
+      if (currentUserId) {
+        try {
+          const status = await colonyAPI.getUserColonyStatus(currentUserId);
+          if (status) {
+            const unlocked = {};
+            status.unlockedColonies.forEach(colonyId => {
+              unlocked[colonyId] = true;
+            });
+            setUnlockedColonies(unlocked);
+            onHoneyChange(status.honey);
+          }
+        } catch (error) {
+          console.error('Error loading colony status:', error);
+        }
+      }
+    };
+
+    loadColonyStatus();
+  }, [currentUserId, onHoneyChange]);
+
+  const handleColonyClick = async (colonyId) => {
+    if (loading) return;
+
     const colony = colonies[colonyId];
     if (!isColonyAccessible(colonyId)) return;
 
@@ -48,9 +75,22 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
         setTravelingBee({ path, index: 0 });
       }
     } else if (honey >= colony.cost) {
-      onHoneyChange(honey - colony.cost);
-      setUnlockedColonies((prev) => ({ ...prev, [colonyId]: true }));
-      if (path) setTravelingBee({ path, index: 0 });
+      setLoading(true);
+      try {
+        const result = await colonyAPI.unlockColony(currentUserId, colonyId);
+        if (result.success) {
+          setUnlockedColonies((prev) => ({ ...prev, [colonyId]: true }));
+          onHoneyChange(result.data.honey);
+          if (path) setTravelingBee({ path, index: 0 });
+        } else {
+          alert(result.message);
+        }
+      } catch (error) {
+        console.error('Error unlocking colony:', error);
+        alert('Failed to unlock colony. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     } else {
       alert(
         `You need ${colony.cost} honey to unlock ${colony.name}. You have ${honey} honey.`
@@ -151,11 +191,10 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                 y1={data.y}
                 x2={mapLayout[connectedId].x}
                 y2={mapLayout[connectedId].y}
-                className={`road ${
-                  unlockedColonies[colonyId] && unlockedColonies[connectedId]
+                className={`road ${unlockedColonies[colonyId] && unlockedColonies[connectedId]
                     ? 'road-unlocked'
                     : 'road-locked'
-                }`}
+                  }`}
                 strokeWidth="1.2"
               />
             ))
@@ -177,15 +216,14 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                            ${position.x},${position.y + 5} 
                            ${position.x - 4.5},${position.y + 2.5} 
                            ${position.x - 4.5},${position.y - 2.5}`}
-                  className={`colony ${
-                    isCurrent
+                  className={`colony ${isCurrent
                       ? 'colony-current'
                       : isUnlocked
-                      ? 'colony-unlocked'
-                      : isAccessible
-                      ? 'colony-locked'
-                      : 'colony-inaccessible'
-                  }`}
+                        ? 'colony-unlocked'
+                        : isAccessible
+                          ? 'colony-locked'
+                          : 'colony-inaccessible'
+                    }`}
                   onClick={() => isAccessible && handleColonyClick(colonyId)}
                   onMouseEnter={() => setHoveredColony(colonyId)}
                   onMouseLeave={() => setHoveredColony(null)}

@@ -7,7 +7,6 @@ import Profile from '../Profile/Profile';
 import Hive from '../Hive/Hive';
 import Messages from '../Messages/Messages';
 import Map from '../Map/Map';
-import { colonies } from '../../data/data.js';
 import './Menu.css';
 
 const Menu = () => {
@@ -19,12 +18,37 @@ const Menu = () => {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [honey, setHoney] = useState(10);
   const [currentColony, setCurrentColony] = useState('honeycomb');
-  const [userProfilePicture, setUserProfilePicture] = useState(
-    localStorage.getItem('userProfilePicture') || null
-  );
-  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
+  const [userProfilePicture, setUserProfilePicture] = useState(null);
+  const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
+
+  // Add debugging and redirect if no user
+  useEffect(() => {
+    console.log('Menu: Component mounted');
+    console.log('Menu: Session storage contents:');
+    console.log('- currentUserId:', sessionStorage.getItem('currentUserId'));
+    console.log('- userName:', sessionStorage.getItem('userName'));
+    console.log('- currentUserEmail:', sessionStorage.getItem('currentUserEmail'));
+    
+    if (!currentUserId) {
+      console.log('Menu: No currentUserId found, redirecting to login');
+      navigate('/login');
+      return;
+    }
+    
+    console.log('Menu: User is logged in with ID:', currentUserId);
+  }, [currentUserId, navigate]);
+
+  // Colony definitions inline
+  const colonies = {
+    honeycomb: { name: "Honeycomb Heights", color: "#ffc107", unlocked: true, cost: 0 },
+    meadow: { name: "Meadow Fields", color: "#4caf50", unlocked: false, cost: 15 },
+    sunset: { name: "Sunset Valley", color: "#ff9800", unlocked: false, cost: 20 },
+    crystal: { name: "Crystal Gardens", color: "#2196f3", unlocked: false, cost: 25 },
+    forest: { name: "Whispering Woods", color: "#795548", unlocked: false, cost: 30 },
+    ocean: { name: "Ocean Breeze", color: "#00bcd4", unlocked: false, cost: 35 }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -43,10 +67,37 @@ const Menu = () => {
   // Fetch user data on component mount
   useEffect(() => {
     if (currentUserId) {
+      console.log('Menu: Fetching data for user:', currentUserId);
+      fetchUserData();
       fetchUserProfile();
       fetchSavedMatches();
+    } else {
+      console.log('Menu: Skipping data fetch - no currentUserId');
     }
   }, [currentUserId]);
+
+  const fetchUserData = async () => {
+    try {
+      const response = await axios.get(`http://localhost:3000/users/${currentUserId}`);
+      if (response.data) {
+        setHoney(response.data.honey || 10);
+        setCurrentColony(response.data.currentColony || 'honeycomb');
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      // Use session storage as fallback
+      setHoney(parseInt(sessionStorage.getItem('userHoney')) || 10);
+      setCurrentColony(sessionStorage.getItem('userColony') || 'honeycomb');
+    }
+  };
+
+  const updateUserData = async (updates) => {
+    try {
+      await axios.put(`http://localhost:3000/users/${currentUserId}`, updates);
+    } catch (error) {
+      console.error('Error updating user data:', error);
+    }
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -56,10 +107,9 @@ const Menu = () => {
 
       if (response.data && response.data.length > 0) {
         const profileData = response.data[0];
-        // Update local storage with fetched data
+        // Update profile picture from backend
         if (profileData[1]) { // profileImage
           setUserProfilePicture(profileData[1]);
-          localStorage.setItem('userProfilePicture', profileData[1]);
         }
       }
     } catch (error) {
@@ -69,11 +119,42 @@ const Menu = () => {
 
   const fetchSavedMatches = async () => {
     try {
-      // This would need to be implemented with a matches/favorites system in the backend
-      // For now, we'll keep using local storage as a fallback
-      const savedMatchesFromStorage = localStorage.getItem('savedMatches');
-      if (savedMatchesFromStorage) {
-        setSavedMatches(JSON.parse(savedMatchesFromStorage));
+      // Fetch matches from backend only
+      const response = await axios.get(`http://localhost:3000/matches/${currentUserId}`);
+      if (response.data && response.data.length > 0) {
+        // For each match, fetch user profile data
+        const matchPromises = response.data.map(async (match) => {
+          const otherUserId = match.user1Id === currentUserId ? match.user2Id : match.user1Id;
+          try {
+            const profileResponse = await axios.get('http://localhost:3000/profiles', {
+              params: { searchUserId: otherUserId }
+            });
+            
+            if (profileResponse.data && profileResponse.data.length > 0) {
+              const profileData = profileResponse.data[0];
+              return {
+                id: otherUserId,
+                name: profileData[4] || `User ${otherUserId}`,
+                age: profileData[2] || 25,
+                bio: profileData[3] || 'Looking for meaningful connections!',
+                location: profileData[6] || 'City, State',
+                colony: currentColony,
+                photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
+                occupation: 'Professional',
+                education: 'University',
+                height: '5\'10"',
+                interests: ['Technology', 'Music', 'Travel']
+              };
+            }
+          } catch (error) {
+            console.error('Error fetching match profile:', error);
+          }
+          return null;
+        });
+
+        const resolvedMatches = await Promise.all(matchPromises);
+        const validMatches = resolvedMatches.filter(match => match !== null);
+        setSavedMatches(validMatches);
       }
     } catch (error) {
       console.error('Error fetching saved matches:', error);
@@ -81,32 +162,71 @@ const Menu = () => {
   };
 
   const handleSaveMatch = async (user) => {
-    if (!savedMatches.find(match => match.id === user.id)) {
+    // Check if already matched
+    if (savedMatches.find(match => match.id === user.id)) {
+      console.log('Already matched with this user');
+      return;
+    }
+
+    try {
+      console.log('Saving match:', user.id);
+      
+      // Log the match to the server
+      await axios.post('http://localhost:3000/matches', {
+        user1Id: currentUserId,
+        user2Id: user.id,
+        matchedAt: new Date().toISOString()
+      });
+
+      // Create a chat between users
+      await axios.post('http://localhost:3000/chat', {
+        user1Id: currentUserId,
+        user2Id: user.id
+      });
+
+      // Update local state
       const updatedMatches = [...savedMatches, user];
       setSavedMatches(updatedMatches);
-      setHoney(prev => prev + 3); // Earn 3 honey for matching
       
-      // Save to local storage (in a real app, this would be saved to backend)
-      localStorage.setItem('savedMatches', JSON.stringify(updatedMatches));
+      // Update honey and sync with backend
+      const newHoney = honey + 3;
+      setHoney(newHoney);
+      updateUserData({ honey: newHoney });
       
-      // Create a chat between users
-      try {
-        await axios.post('http://localhost:3000/chat', {
-          user1Id: currentUserId,
-          user2Id: user.id
-        });
-      } catch (error) {
-        console.error('Error creating chat for match:', error);
-      }
+      console.log('Match saved successfully, routing to messages...');
+      
+      // Route directly to the conversation with this user
+      setSelectedMatchForMessage(user);
+      setPreviousView(activeView);
+      setActiveView('messages');
+      
+    } catch (error) {
+      console.error('Error saving match:', error);
+      
+      // Fallback - still add to local state even if backend fails
+      const updatedMatches = [...savedMatches, user];
+      setSavedMatches(updatedMatches);
+      const newHoney = honey + 3;
+      setHoney(newHoney);
+      
+      // Still route to messages
+      setSelectedMatchForMessage(user);
+      setPreviousView(activeView);
+      setActiveView('messages');
     }
   };
 
   const handleSendMessage = () => {
-    setHoney(prev => prev + 1); // Earn 1 honey per message
+    const newHoney = honey + 1;
+    setHoney(newHoney);
+    updateUserData({ honey: newHoney });
   };
 
   const handleRemoveMatch = (userId) => {
-    setSavedMatches(prev => prev.filter(match => match.id !== userId));
+    setSavedMatches(prev => {
+      const updated = prev.filter(match => match.id !== userId);
+      return updated;
+    });
   };
 
   const handleViewProfile = (user) => {
@@ -144,11 +264,6 @@ const Menu = () => {
 
   const handleProfilePictureUpdate = (newPicture) => {
     setUserProfilePicture(newPicture);
-    if (newPicture) {
-      localStorage.setItem('userProfilePicture', newPicture);
-    } else {
-      localStorage.removeItem('userProfilePicture');
-    }
   };
 
   const handleNavigateToProfile = () => {
@@ -161,16 +276,10 @@ const Menu = () => {
   };
 
   const handleLogout = () => {
-    // Clear user data from localStorage
-    localStorage.removeItem('currentUserId');
-    localStorage.removeItem('currentUserEmail');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userAge');
-    localStorage.removeItem('userLocation');
-    localStorage.removeItem('userDescription');
-    localStorage.removeItem('userInterests');
-    localStorage.removeItem('userProfilePicture');
-    localStorage.removeItem('savedMatches');
+    // Clear session data only
+    sessionStorage.removeItem('currentUserId');
+    sessionStorage.removeItem('currentUserEmail');
+    sessionStorage.removeItem('userName');
     
     navigate('/');
   };
@@ -188,17 +297,17 @@ const Menu = () => {
           <div className="viewed-profile">
             <div className="profile-card">
               <div className="profile-photos">
-                <img 
-                  src={viewingProfile.photos[0]} 
+                <img
+                  src={viewingProfile.photos[0]}
                   alt={viewingProfile.name}
                   className="profile-main-photo"
                 />
                 {viewingProfile.photos.length > 1 && (
                   <div className="additional-photos">
                     {viewingProfile.photos.slice(1).map((photo, index) => (
-                      <img 
+                      <img
                         key={index}
-                        src={photo} 
+                        src={photo}
                         alt={`${viewingProfile.name} ${index + 2}`}
                         className="profile-additional-photo"
                       />
@@ -206,7 +315,7 @@ const Menu = () => {
                   </div>
                 )}
               </div>
-              
+
               <div className="profile-info">
                 <div className="profile-header">
                   <h2 className="profile-name">{viewingProfile.name}, {viewingProfile.age}</h2>
@@ -217,10 +326,10 @@ const Menu = () => {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="profile-details">
                   <p className="profile-bio">{viewingProfile.bio}</p>
-                  
+
                   <div className="profile-stats">
                     <div className="stat-item">
                       <span className="stat-label">Occupation:</span>
@@ -235,7 +344,7 @@ const Menu = () => {
                       <span className="stat-value">{viewingProfile.height}</span>
                     </div>
                   </div>
-                  
+
                   <div className="profile-interests">
                     <h4>Interests</h4>
                     <div className="interests-list">
@@ -419,6 +528,5 @@ const Menu = () => {
     </div>
   );
 };
-
 
 export default Menu;
