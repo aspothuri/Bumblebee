@@ -198,9 +198,14 @@ const Search = ({ onSaveMatch, currentColony }) => {
 
   const handleAddToHive = async (user) => {
     if (onSaveMatch) {
-      onSaveMatch(user);
+      try {
+        await onSaveMatch(user);
+        console.log(`Added ${user.name} to your Hive! +3 honey`);
+      } catch (error) {
+        console.error('Error adding to hive:', error);
+        console.log(`Added ${user.name} to your Hive! (with error)`);
+      }
     }
-    console.log(`Added ${user.name} to your Hive!`);
   };
 
   const handleBuzzOff = (user) => {

@@ -165,11 +165,18 @@ const Menu = () => {
     // Check if already matched
     if (savedMatches.find(match => match.id === user.id)) {
       console.log('Already matched with this user');
-      return;
+      return Promise.resolve(); // Return resolved promise
     }
 
     try {
-      console.log('Saving match:', user.id);
+      console.log('Saving match:', user.id, 'Current honey:', honey);
+      
+      // Calculate new honey amount first
+      const newHoney = honey + 3;
+      console.log('New honey amount will be:', newHoney);
+      
+      // Update honey immediately in the UI
+      setHoney(newHoney);
       
       // Log the match to the server
       await axios.post('http://localhost:3000/matches', {
@@ -188,32 +195,44 @@ const Menu = () => {
       const updatedMatches = [...savedMatches, user];
       setSavedMatches(updatedMatches);
       
-      // Update honey and sync with backend
-      const newHoney = honey + 3;
-      setHoney(newHoney);
-      updateUserData({ honey: newHoney });
+      // Sync honey with backend
+      await updateUserData({ honey: newHoney });
       
-      console.log('Match saved successfully, routing to messages...');
+      // Also update session storage for persistence
+      sessionStorage.setItem('userHoney', newHoney.toString());
       
-      // Route directly to the conversation with this user
-      setSelectedMatchForMessage(user);
-      setPreviousView(activeView);
-      setActiveView('messages');
+      console.log('Match saved successfully, honey increased from', honey, 'to', newHoney);
+      return Promise.resolve(); // Explicitly return resolved promise
       
     } catch (error) {
       console.error('Error saving match:', error);
       
-      // Fallback - still add to local state even if backend fails
+      // Calculate new honey amount for fallback
+      const newHoney = honey + 3;
+      
+      // Fallback - still add to local state and increase honey even if backend fails
       const updatedMatches = [...savedMatches, user];
       setSavedMatches(updatedMatches);
-      const newHoney = honey + 3;
       setHoney(newHoney);
       
-      // Still route to messages
-      setSelectedMatchForMessage(user);
-      setPreviousView(activeView);
-      setActiveView('messages');
+      // Try to update backend anyway
+      try {
+        await updateUserData({ honey: newHoney });
+        sessionStorage.setItem('userHoney', newHoney.toString());
+      } catch (updateError) {
+        console.error('Failed to update honey in backend:', updateError);
+      }
+      
+      console.log('Match saved with fallback, honey increased to:', newHoney);
+      return Promise.resolve(); // Return resolved promise even on error
     }
+  };
+
+  const handleNavigateToMessage = (user) => {
+    console.log('Menu: Navigating to message with:', user.name);
+    setPreviousView(activeView);
+    setSelectedMatchForMessage(user);
+    setActiveView('messages');
   };
 
   const handleSendMessage = () => {
@@ -361,7 +380,12 @@ const Menu = () => {
 
     switch (activeView) {
       case 'feed':
-        return <Feed onSaveMatch={handleSaveMatch} currentColony={currentColony} savedMatches={savedMatches} />;
+        return <Feed 
+          onSaveMatch={handleSaveMatch} 
+          currentColony={currentColony} 
+          savedMatches={savedMatches} 
+          onNavigateToMessage={handleNavigateToMessage}
+        />;
       case 'search':
         return <Search onSaveMatch={handleSaveMatch} currentColony={currentColony} />;
       case 'profile':

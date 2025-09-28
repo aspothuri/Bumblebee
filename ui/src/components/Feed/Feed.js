@@ -2,18 +2,14 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './Feed.css';
 
-const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
+const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
   const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dismissedUsers, setDismissedUsers] = useState(new Set());
   const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
 
-  // Filter profiles to exclude dismissed users
-  const availableProfiles = profiles.filter(profile => !dismissedUsers.has(profile.id));
-  const currentProfile = availableProfiles[currentProfileIndex];
+  const currentProfile = profiles[currentProfileIndex];
 
-  // Add debugging at component level
   useEffect(() => {
     console.log('Feed: Component mounted');
     console.log('Feed: Session storage contents:');
@@ -22,7 +18,6 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
     console.log('- currentUserEmail:', sessionStorage.getItem('currentUserEmail'));
   }, []);
 
-  // Colony definitions inline
   const colonies = {
     honeycomb: { name: "Honeycomb Heights", color: "#ffc107", unlocked: true, cost: 0 },
     meadow: { name: "Meadow Fields", color: "#4caf50", unlocked: false, cost: 15 },
@@ -32,51 +27,38 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
     ocean: { name: "Ocean Breeze", color: "#00bcd4", unlocked: false, cost: 35 }
   };
 
-  // Fetch compatible users from backend
   useEffect(() => {
     const fetchCompatibleUsers = async () => {
       console.log('Feed: Starting fetchCompatibleUsers...');
-      console.log('Feed: currentUserId state:', currentUserId);
-      console.log('Feed: currentUserId from session:', sessionStorage.getItem('currentUserId'));
-      console.log('Feed: Current saved matches:', savedMatches.map(m => m.id));
+      console.log('Feed: currentUserId:', currentUserId);
 
       if (!currentUserId) {
         console.log('Feed: No currentUserId found - user may not be logged in');
         setLoading(false);
         return;
       }
-      
-      console.log('Feed: Starting fetch for currentUserId:', currentUserId);
+
       setLoading(true);
       try {
         let fetchedProfiles = [];
-        
-        // Get list of saved match IDs to exclude
-        const savedMatchIds = savedMatches.map(match => match.id);
-        
-        // First try to get compatible users
+
         try {
           console.log('Feed: Attempting compatibility API call...');
-          const compatibilityResponse = await axios.get(`http://localhost:3000/profiles/${currentUserId}/compatibility`);
+          const compatibilityResponse = await axios.get(
+            `http://localhost:3000/profiles/${currentUserId}/compatibility`
+          );
           console.log('Feed: Compatibility response:', compatibilityResponse.data);
-          
+
           if (compatibilityResponse.data && compatibilityResponse.data.length > 0) {
             console.log('Feed: Found compatible users:', compatibilityResponse.data.length);
-            
-            // Filter out saved matches and dismissed users
-            const availableCompatibleUsers = compatibilityResponse.data.filter(user => 
-              !savedMatchIds.includes(user.userId) && !dismissedUsers.has(user.userId)
-            );
-            console.log('Feed: Compatible users after excluding saved matches and dismissed users:', availableCompatibleUsers.length);
-            
-            // Fetch full profile data for compatible users
-            const profilePromises = availableCompatibleUsers.slice(0, 10).map(async (compatibleUser) => {
+
+            const profilePromises = compatibilityResponse.data.slice(0, 10).map(async (compatibleUser) => {
               try {
                 console.log('Feed: Fetching profile for compatible user:', compatibleUser.userId);
                 const profileResponse = await axios.get('http://localhost:3000/profiles', {
                   params: { searchUserId: compatibleUser.userId }
                 });
-                
+
                 if (profileResponse.data && profileResponse.data.length > 0) {
                   const profileData = profileResponse.data[0];
                   return {
@@ -102,34 +84,21 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
 
             const compatibleProfiles = await Promise.all(profilePromises);
             fetchedProfiles = compatibleProfiles.filter(profile => profile !== null);
-            
-            // Ensure profiles are sorted by compatibility in descending order
             fetchedProfiles.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
-          } else {
-            console.log('Feed: No compatible users found in response');
           }
         } catch (compatibilityError) {
           console.log('Feed: Compatibility endpoint failed:', compatibilityError.response?.status, compatibilityError.message);
         }
-        
-        // If no compatible users found, fetch all profiles as fallback
+
         if (fetchedProfiles.length === 0) {
           console.log('Feed: Fetching all profiles as fallback...');
-          
           try {
             const allProfilesResponse = await axios.get('http://localhost:3000/profiles');
             console.log('Feed: All profiles response:', allProfilesResponse.data?.length || 0, 'profiles found');
-            
+
             if (allProfilesResponse.data && allProfilesResponse.data.length > 0) {
-              // Filter out current user, saved matches, and dismissed users
               const profilePromises = allProfilesResponse.data
-                .filter(profile => {
-                  const isCurrentUser = profile[0] === currentUserId;
-                  const isAlreadySaved = savedMatchIds.includes(profile[0]);
-                  const isDismissed = dismissedUsers.has(profile[0]);
-                  console.log('Feed: Profile', profile[0], 'is current user?', isCurrentUser, 'is already saved?', isAlreadySaved, 'is dismissed?', isDismissed);
-                  return !isCurrentUser && !isAlreadySaved && !isDismissed;
-                })
+                .filter(profile => profile[0] !== currentUserId) // only exclude current user
                 .slice(0, 10)
                 .map(async (profileData) => {
                   return {
@@ -143,26 +112,21 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
                     occupation: 'Professional',
                     education: 'University',
                     height: '5\'10"',
-                    compatibility: Math.min(100, Math.max(60, Math.floor(Math.random() * 40) + 60)) // Capped at 100%
+                    compatibility: Math.min(100, Math.max(60, Math.floor(Math.random() * 40) + 60))
                   };
                 });
 
               const allProfiles = await Promise.all(profilePromises);
               fetchedProfiles = allProfiles.filter(profile => profile !== null);
-              
-              // Sort fallback profiles by compatibility in descending order
               fetchedProfiles.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
             }
           } catch (allProfilesError) {
             console.error('Feed: Failed to fetch all profiles:', allProfilesError);
           }
         }
-        
+
         console.log('Feed: Final fetched profiles:', fetchedProfiles.length);
-        console.log('Feed: Top 3 profiles by compatibility:', fetchedProfiles.slice(0, 3).map(u => ({name: u.name, id: u.id, compatibility: u.compatibility})));
-        
         setProfiles(fetchedProfiles);
-        
       } catch (error) {
         console.error('Error fetching compatible users:', error);
         setProfiles([]);
@@ -172,51 +136,41 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
     };
 
     fetchCompatibleUsers();
-  }, [currentUserId, currentColony, savedMatches, dismissedUsers]);
+  }, [currentUserId, currentColony]);
 
   const handleBuzzOff = () => {
     if (!currentProfile) return;
-    
-    console.log(`Buzzing off ${currentProfile.name} - they won't appear again this session`);
-    
-    // Add current profile to dismissed users
-    setDismissedUsers(prev => new Set([...prev, currentProfile.id]));
-    
-    // Move to next profile or cycle back
-    const nextIndex = currentProfileIndex;
-    const filteredProfiles = profiles.filter(profile => !dismissedUsers.has(profile.id) && profile.id !== currentProfile.id);
-    
-    if (filteredProfiles.length === 0) {
-      // No more profiles available
-      setCurrentProfileIndex(0);
-    } else if (nextIndex >= filteredProfiles.length) {
-      // If current index is beyond available profiles, go to first
-      setCurrentProfileIndex(0);
-    } else {
-      // Stay at same index (which will now show the next profile due to filtering)
-      setCurrentProfileIndex(nextIndex);
-    }
+    console.log(`Buzzing off ${currentProfile.name}`);
+    const nextIndex = (currentProfileIndex + 1) % profiles.length;
+    setCurrentProfileIndex(nextIndex);
   };
 
-  const handleYoureMyHoney = () => {
+  const handleYoureMyHoney = async () => {
     if (!currentProfile) return;
-    
     console.log(`Matched with ${currentProfile.name}!`);
+    
+    // Save the match first and wait for it to complete
     if (onSaveMatch) {
-      onSaveMatch(currentProfile);
+      try {
+        await onSaveMatch(currentProfile);
+        console.log('Feed: Match saved successfully, honey should be increased by 3');
+        
+        // Navigate to conversation with this person after successful save
+        if (onNavigateToMessage) {
+          onNavigateToMessage(currentProfile);
+        }
+      } catch (error) {
+        console.error('Feed: Error saving match:', error);
+        // Still navigate even if save fails
+        if (onNavigateToMessage) {
+          onNavigateToMessage(currentProfile);
+        }
+      }
     }
     
-    // Move to next available profile
-    const nextIndex = currentProfileIndex;
-    const filteredProfiles = availableProfiles.filter(profile => profile.id !== currentProfile.id);
-    
-    if (filteredProfiles.length === 0) {
-      setCurrentProfileIndex(0);
-    } else if (nextIndex >= filteredProfiles.length) {
-      setCurrentProfileIndex(0);
-    } else {
-      setCurrentProfileIndex(nextIndex);
-    }
+    // Move to next profile
+    const nextIndex = (currentProfileIndex + 1) % profiles.length;
+    setCurrentProfileIndex(nextIndex);
   };
 
   if (loading) {
@@ -230,32 +184,13 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
     );
   }
 
-  if (!currentProfile || availableProfiles.length === 0) {
+  if (!currentProfile || profiles.length === 0) {
     return (
       <div className="feed-container">
         <div className="no-profiles">
           <div className="no-profiles-icon">🐝</div>
-          <h2>No more profiles available!</h2>
-          <p>You've seen all available users or dismissed them.</p>
-          <p>Dismissed users: {dismissedUsers.size}</p>
-          <p>Current User ID: {currentUserId}</p>
-          <button 
-            onClick={() => {
-              setDismissedUsers(new Set());
-              setCurrentProfileIndex(0);
-            }}
-            style={{ 
-              padding: '10px 20px', 
-              marginTop: '10px',
-              backgroundColor: '#ffc107',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              marginRight: '10px'
-            }}
-          >
-            🔄 Reset Dismissed Users
-          </button>
+          <h2>No profiles found!</h2>
+          <p>Check back later for more matches.</p>
           <button 
             onClick={() => window.location.reload()}
             style={{ 
@@ -267,7 +202,7 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
               cursor: 'pointer'
             }}
           >
-            🔄 Refresh All
+            🔄 Refresh
           </button>
         </div>
       </div>
@@ -317,7 +252,6 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
           
           <div className="profile-details">
             <p className="profile-bio">{currentProfile.bio}</p>
-            
             <div className="profile-stats">
               <div className="stat-item">
                 <span className="stat-label">Occupation:</span>
@@ -336,16 +270,10 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
         </div>
         
         <div className="action-buttons">
-          <button 
-            className="buzz-off-btn"
-            onClick={handleBuzzOff}
-          >
+          <button className="buzz-off-btn" onClick={handleBuzzOff}>
             🐝 Buzz Off
           </button>
-          <button 
-            className="honey-btn"
-            onClick={handleYoureMyHoney}
-          >
+          <button className="honey-btn" onClick={handleYoureMyHoney}>
             🍯 You're Bee-utiful (+3 🍯)
           </button>
         </div>
