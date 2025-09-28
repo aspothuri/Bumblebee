@@ -54,7 +54,7 @@ async function getCompatibleUsers(userId) {
       const compatibility = simscore(currentVector, vector);
       return {
         userId: tagDoc.user.toString(),
-        compatibility: Math.max(0, Math.min(100, compatibility)) // Ensure 0-100 range
+        compatibility: Math.max(0, Math.min(100, Math.round(compatibility))) // Ensure 0-100 range and round to integer
       };
     });
 

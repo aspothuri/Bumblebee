@@ -82,7 +82,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                     occupation: 'Professional',
                     education: 'University',
                     height: '5\'10"',
-                    compatibility: Math.round(compatibleUser.compatibility) || 75
+                    compatibility: Math.min(100, Math.max(0, Math.round(compatibleUser.compatibility))) || 75
                   };
                 }
                 return null;
@@ -95,6 +95,9 @@ const Search = ({ onSaveMatch, currentColony }) => {
             const compatibleProfiles = await Promise.all(userPromises);
             fetchedUsers = compatibleProfiles.filter(user => user !== null);
             console.log('Search: Compatible profiles after filtering:', fetchedUsers.length);
+            
+            // Ensure users are sorted by compatibility in descending order
+            fetchedUsers.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
           } else {
             console.log('Search: No compatible users found in response');
           }
@@ -141,7 +144,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                       occupation: 'Professional',
                       education: 'University',
                       height: '5\'10"',
-                      compatibility: Math.floor(Math.random() * 40) + 60 // Random compatibility 60-100%
+                      compatibility: Math.min(100, Math.max(60, Math.floor(Math.random() * 40) + 60)) // Random compatibility 60-100%, capped at 100%
                     };
                     
                     console.log('Search: Formatted profile:', formattedProfile.name, formattedProfile.id);
@@ -154,6 +157,9 @@ const Search = ({ onSaveMatch, currentColony }) => {
 
               const allProfiles = await Promise.all(profilePromises);
               fetchedUsers = allProfiles.filter(user => user !== null);
+              
+              // Sort fallback profiles by compatibility in descending order  
+              fetchedUsers.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
               console.log('Search: Final processed profiles:', fetchedUsers.length);
             } else {
               console.log('Search: No profiles found in database response');
@@ -164,7 +170,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
         }
         
         console.log('Search: Final fetched users count:', fetchedUsers.length);
-        console.log('Search: Sample users:', fetchedUsers.slice(0, 3).map(u => ({name: u.name, id: u.id})));
+        console.log('Search: Sample users with compatibility:', fetchedUsers.slice(0, 3).map(u => ({name: u.name, id: u.id, compatibility: u.compatibility})));
         
         setAllUsers(fetchedUsers);
         setFilteredUsers(fetchedUsers);
@@ -309,8 +315,15 @@ const Search = ({ onSaveMatch, currentColony }) => {
             
             <div className="profile-info">
               <div className="profile-header">
-                <h2 className="profile-name">{viewingProfile.name}, {viewingProfile.age}</h2>
-                <p className="profile-location">{viewingProfile.location}</p>
+                <div className="profile-basic-info">
+                  <h2 className="profile-name">{viewingProfile.name}, {viewingProfile.age}</h2>
+                  <p className="profile-location">{viewingProfile.location}</p>
+                </div>
+                {viewingProfile.compatibility && (
+                  <div className="compatibility-badge">
+                    💕 {Math.min(100, Math.round(viewingProfile.compatibility))}%
+                  </div>
+                )}
                 <div className="profile-colony">
                   <span className="colony-badge" style={{ backgroundColor: colonies[viewingProfile.colony].color }}>
                     🏛️ {colonies[viewingProfile.colony].name}
@@ -389,7 +402,12 @@ const Search = ({ onSaveMatch, currentColony }) => {
             <div key={user.id} className="result-card" onClick={() => setViewingProfile(user)}>
               <img src={user.photos[0]} alt={user.name} className="result-photo" />
               <div className="result-info">
-                <h4>{user.name}, {user.age}</h4>
+                <div className="result-header">
+                  <h4>{user.name}, {user.age}</h4>
+                  {user.compatibility && (
+                    <span className="result-compatibility">💕 {Math.min(100, Math.round(user.compatibility))}%</span>
+                  )}
+                </div>
                 <p>{user.location}</p>
                 <div className="colony-badge" style={{ backgroundColor: colonies[user.colony].color }}>
                   🏛️ {colonies[user.colony].name}

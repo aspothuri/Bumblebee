@@ -142,7 +142,8 @@ const Menu = () => {
                 photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
                 occupation: 'Professional',
                 education: 'University',
-                height: '5\'10"'
+                height: '5\'10"',
+                compatibility: Math.min(100, Math.max(60, Math.floor(Math.random() * 40) + 60)) // Capped at 100%
               };
             }
           } catch (error) {
@@ -317,8 +318,15 @@ const Menu = () => {
 
               <div className="profile-info">
                 <div className="profile-header">
-                  <h2 className="profile-name">{viewingProfile.name}, {viewingProfile.age}</h2>
-                  <p className="profile-location">{viewingProfile.location}</p>
+                  <div className="profile-basic-info">
+                    <h2 className="profile-name">{viewingProfile.name}, {viewingProfile.age}</h2>
+                    <p className="profile-location">{viewingProfile.location}</p>
+                  </div>
+                  {viewingProfile.compatibility && (
+                    <div className="compatibility-badge">
+                      💕 {Math.min(100, Math.round(viewingProfile.compatibility))}%
+                    </div>
+                  )}
                   <div className="profile-colony">
                     <span className="colony-badge" style={{ backgroundColor: colonies[viewingProfile.colony].color }}>
                       🏛️ {colonies[viewingProfile.colony].name}
