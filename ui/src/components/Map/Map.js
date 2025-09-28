@@ -14,7 +14,6 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
   const [mapLoading, setMapLoading] = useState(false);
   const [tooltipTimeout, setTooltipTimeout] = useState(null);
 
-  // Load user's personalized colony system
   useEffect(() => {
     const loadUserColonies = async () => {
       if (!currentUserId) {
@@ -26,6 +25,9 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
       setMapLoading(true);
       try {
         console.log('Map: Loading personalized colonies for user:', currentUserId);
+        
+        const existingColony = currentColony && currentColony !== 'politics' ? currentColony : null;
+        
         const colonyData = await getUserColonies(currentUserId);
 
         if (colonyData) {
@@ -33,21 +35,18 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
           setMapLayout(colonyData.mapLayout);
           setRankedTags(colonyData.rankedTags);
 
-          // Initialize unlocked colonies - start with top colony and 3 nearest
           const initialUnlocked = {};
-          const startingColony = colonyData.startingColony || 'politics'; // Default to Debate District
+          const startingColony = existingColony || colonyData.startingColony || 'politics';
           initialUnlocked[startingColony] = true;
 
-          // Unlock 3 closest colonies based on ranking
           const nearbyColonies = colonyData.rankedTags.slice(1, 4);
           nearbyColonies.forEach((colony) => {
-            initialUnlocked[colony] = false; // Available to unlock
+            initialUnlocked[colony] = false; 
           });
 
           setUnlockedColonies(initialUnlocked);
 
-          // Set starting colony if not already set
-          if (!currentColony || !colonyData.colonies[currentColony]) {
+          if (!existingColony || !colonyData.colonies[existingColony]) {
             onColonyChange(startingColony);
           }
 
@@ -63,9 +62,8 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     };
 
     loadUserColonies();
-  }, [currentUserId]);
+  }, [currentUserId, onColonyChange]); 
 
-  // Simple adjacency map for colonies
   const colonyConnections = {
     honeycomb: ['meadow', 'sunset'],
     meadow: ['honeycomb', 'crystal', 'forest'],
@@ -75,7 +73,6 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     ocean: ['sunset', 'crystal'],
   };
 
-  // 🔹 BFS shortest path finder
   const findShortestPath = (start, end) => {
     if (start === end) return [start];
 
@@ -110,40 +107,33 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     console.log('Map: Handling colony click:', colonyId, 'unlocked?', unlockedColonies[colonyId]);
 
     if (unlockedColonies[colonyId]) {
-      // Already unlocked, just travel there
       if (colonyId !== currentColony) {
         console.log('Map: Traveling to unlocked colony:', colonyId);
         onColonyChange(colonyId);
       }
     } else if (honey >= colony.cost) {
-      // Can afford to unlock
       setMapLoading(true);
       try {
         console.log('Map: Unlocking colony:', colonyId, 'for', colony.cost, 'honey');
 
-        // Unlock the colony
         const newUnlocked = { ...unlockedColonies, [colonyId]: true };
 
-        // Unlock next accessible colonies (next 3 in ranking after this one)
         const currentIndex = rankedTags.indexOf(colonyId);
         const nextColonies = rankedTags.slice(currentIndex + 1, currentIndex + 4);
         nextColonies.forEach((nextColony) => {
           if (!newUnlocked[nextColony]) {
-            newUnlocked[nextColony] = false; // Make available to unlock
+            newUnlocked[nextColony] = false; 
           }
         });
 
         setUnlockedColonies(newUnlocked);
 
-        // Store in session storage
         sessionStorage.setItem('unlockedColonies', JSON.stringify(newUnlocked));
 
-        // Deduct honey
         const newHoney = honey - colony.cost;
         onHoneyChange(newHoney);
         sessionStorage.setItem('userHoney', newHoney.toString());
 
-        // Travel to the newly unlocked colony
         onColonyChange(colonyId);
 
         console.log('Map: Successfully unlocked and traveled to:', colonyId);

@@ -32,7 +32,6 @@ function Signup() {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
       if (!validTypes.includes(file.type)) {
         setErrors(prev => ({
@@ -42,7 +41,6 @@ function Signup() {
         return;
       }
 
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setErrors(prev => ({
           ...prev,
@@ -51,13 +49,11 @@ function Signup() {
         return;
       }
 
-      // Clear any previous errors
       setErrors(prev => ({
         ...prev,
         profilePicture: undefined
       }));
 
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviewImage(e.target.result);
@@ -77,7 +73,6 @@ function Signup() {
       profilePicture: null
     }));
     setPreviewImage(null);
-    // Reset file input
     const fileInput = document.getElementById('profilePicture');
     if (fileInput) fileInput.value = '';
   };
@@ -137,7 +132,6 @@ function Signup() {
     if (Object.keys(newErrors).length === 0) {
       setLoading(true);
       try {
-        // Step 1: Create user account
         console.log('Signup: Creating user account...');
         const userResponse = await axios.post('http://localhost:3000/users', {
           username: formData.username,
@@ -151,7 +145,6 @@ function Signup() {
           const userId = userResponse.data._id;
           console.log('Signup: User created with ID:', userId);
 
-          // Step 2: Create user profile
           const profileData = {
             profileImage: previewImage || '',
             age: parseInt(formData.age),
@@ -167,7 +160,6 @@ function Signup() {
           if (profileResponse.data) {
             console.log('Signup: Profile created successfully');
 
-            // Step 3: Store user data in sessionStorage (same as login)
             sessionStorage.setItem('currentUserId', userId);
             sessionStorage.setItem('currentUserEmail', formData.email);
             sessionStorage.setItem('userName', formData.name);
@@ -176,6 +168,26 @@ function Signup() {
             sessionStorage.setItem('userDescription', formData.description);
             sessionStorage.setItem('userHoney', '10');
             sessionStorage.setItem('userColony', 'honeycomb');
+
+            try {
+              console.log('Signup: Determining primary colony...');
+              const { getUserColonyFromTags } = await import('../../services/api');
+              const primaryColony = await getUserColonyFromTags(userId);
+              
+              if (primaryColony && primaryColony !== 'politics') {
+                sessionStorage.setItem('userPrimaryColony', primaryColony);
+                sessionStorage.setItem('userColony', primaryColony);
+                console.log('Signup: Set primary colony:', primaryColony);
+              } else {
+                sessionStorage.setItem('userPrimaryColony', 'politics');
+                sessionStorage.setItem('userColony', 'politics');
+                console.log('Signup: Set default colony: politics');
+              }
+            } catch (colonyError) {
+              console.error('Signup: Error determining primary colony:', colonyError);
+              sessionStorage.setItem('userPrimaryColony', 'politics');
+              sessionStorage.setItem('userColony', 'politics');
+            }
 
             console.log('Signup successful:', {
               userId,

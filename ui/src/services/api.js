@@ -34,8 +34,17 @@ export const tagColonies = {
   gardening: { name: "Bloom Borough", color: "#55a3ff", icon: "🌻" }
 };
 
+// Cache for colony assignments to avoid repeated API calls
+const colonyCache = new Map();
+
 // Get colony assignment for a user based on their database tags
 export const getUserColonyFromTags = async (userId) => {
+  // Check cache first
+  if (colonyCache.has(userId)) {
+    console.log('API: Using cached colony for user:', userId, colonyCache.get(userId));
+    return colonyCache.get(userId);
+  }
+
   try {
     console.log('API: Getting user colony from database tags for:', userId);
     const response = await axios.get('http://localhost:3000/tags');
@@ -43,7 +52,9 @@ export const getUserColonyFromTags = async (userId) => {
     const userTagData = response.data.find(tagArray => tagArray[0] === userId);
     if (!userTagData) {
       console.log('API: No tags found for user, returning default colony');
-      return 'politics'; // Default to Debate District
+      const defaultColony = 'politics'; // Default to Debate District
+      colonyCache.set(userId, defaultColony);
+      return defaultColony;
     }
     
     // Convert array to object with tag names
@@ -72,11 +83,20 @@ export const getUserColonyFromTags = async (userId) => {
     }
     
     console.log('API: User primary colony based on tags:', highestTag, 'with score:', highestScore);
+    
+    // Cache the result
+    colonyCache.set(userId, highestTag);
+    
+    // Store in session storage for immediate access
+    sessionStorage.setItem('userPrimaryColony', highestTag);
+    
     return highestTag;
     
   } catch (error) {
     console.error('API: Error fetching user tags for colony assignment:', error);
-    return 'politics'; // Default fallback to Debate District
+    const defaultColony = 'politics'; // Default fallback to Debate District
+    colonyCache.set(userId, defaultColony);
+    return defaultColony;
   }
 };
 
@@ -143,7 +163,6 @@ const getConnections = (tag, rankings, index) => {
   return connections;
 };
 
-// Fetch user's personalized colonies
 export const getUserColonies = async (userId) => {
   try {
     console.log('API: Fetching user tags for:', userId);
@@ -154,7 +173,6 @@ export const getUserColonies = async (userId) => {
       throw new Error('User tags not found');
     }
     
-    // Convert array to object with tag names
     const tagKeys = [
       'adventure', 'creativity', 'fitness', 'technology', 'foodCooking', 'reading', 'moviesTV',
       'music', 'travel', 'socializing', 'quietNightsIn', 'hiking', 'gaming', 'sports', 'comedy',
@@ -168,7 +186,6 @@ export const getUserColonies = async (userId) => {
       userTags[key] = userTagData[index + 1] || 1;
     });
     
-    // Rank tags by score (highest first)
     const rankedTags = tagKeys
       .map(tag => ({ tag, score: userTags[tag] }))
       .sort((a, b) => b.score - a.score)
@@ -177,22 +194,20 @@ export const getUserColonies = async (userId) => {
     
     console.log('API: User tag rankings:', rankedTags);
     
-    // Generate colonies object
     const colonies = {};
     rankedTags.forEach(tag => {
       colonies[tag] = {
         ...tagColonies[tag],
-        cost: Math.max(0, 10 + (rankedTags.indexOf(tag) * 5)) // Closer colonies cost less
+        cost: Math.max(0, 10 + (rankedTags.indexOf(tag) * 5)) 
       };
     });
     
-    // Generate map layout
     const mapLayout = generateMapLayout(userTags, rankedTags);
     
     return {
       colonies,
       mapLayout,
-      startingColony: rankedTags[0] || 'politics', // Fallback to Debate District
+      startingColony: rankedTags[0] || 'politics',
       userTags,
       rankedTags
     };
@@ -204,7 +219,14 @@ export const getUserColonies = async (userId) => {
   }
 };
 
-// Legacy exports for compatibility
+export const clearColonyCache = (userId) => {
+  if (userId) {
+    colonyCache.delete(userId);
+  } else {
+    colonyCache.clear();
+  }
+};
+
 export const colonies = tagColonies;
 export const mapLayout = {};
 export const colonyAPI = {

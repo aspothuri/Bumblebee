@@ -8,7 +8,6 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
   const [conversations, setConversations] = useState({});
   const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
 
-  // Add debugging at component level
   useEffect(() => {
     console.log('Messages: Component mounted');
     console.log('Messages: Session storage contents:');
@@ -21,12 +20,10 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
     }
   }, []);
 
-  // Initialize conversations by fetching from backend
   const initializeConversation = async (userId) => {
     if (!conversations[userId] && currentUserId) {
       try {
         console.log('Messages: Initializing conversation with user:', userId);
-        // Try to get existing chat
         const response = await axios.get('http://localhost:3000/chat', {
           params: {
             user1Id: currentUserId,
@@ -36,10 +33,9 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
 
         if (response.data) {
           console.log('Messages: Found existing chat with', response.data.messages?.length || 0, 'messages');
-          // Chat exists, format messages
           const messages = (response.data.messages || []).map((msg, index) => ({
             id: index,
-            text: msg[1], // content
+            text: msg[1],
             sender: msg[0] === currentUserId ? 'me' : 'them',
             timestamp: new Date()
           }));
@@ -52,21 +48,18 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
       } catch (error) {
         if (error.response?.status === 404) {
           console.log('Messages: Chat not found, creating new one for user:', userId);
-          // Chat doesn't exist, create new one
           try {
             await axios.post('http://localhost:3000/chat', {
               user1Id: currentUserId,
               user2Id: userId
             });
             
-            // Initialize with empty conversation
             setConversations(prev => ({
               ...prev,
               [userId]: []
             }));
           } catch (createError) {
             console.error('Error creating chat:', createError);
-            // Still initialize with empty array as fallback
             setConversations(prev => ({
               ...prev,
               [userId]: []
@@ -74,7 +67,6 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
           }
         } else {
           console.error('Error initializing conversation:', error);
-          // Initialize with empty array as fallback
           setConversations(prev => ({
             ...prev,
             [userId]: []
@@ -84,7 +76,6 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
     }
   };
 
-  // Function to fetch new messages from backend
   const fetchNewMessages = async () => {
     if (!activeChat || !currentUserId) return;
 
@@ -99,12 +90,11 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
       if (response.data && response.data.messages) {
         const messages = response.data.messages.map((msg, index) => ({
           id: index,
-          text: msg[1], // content
+          text: msg[1], 
           sender: msg[0] === currentUserId ? 'me' : 'them',
           timestamp: new Date()
         }));
 
-        // Only update if there are new messages
         const currentMessages = conversations[activeChat.id] || [];
         if (messages.length > currentMessages.length) {
           setConversations(prev => ({
@@ -118,14 +108,13 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
     }
   };
 
-  // Auto-refresh effect - check for new messages every second
   useEffect(() => {
     let intervalId;
 
     if (activeChat) {
       intervalId = setInterval(() => {
         fetchNewMessages();
-      }, 1000); // Refresh every 1 second
+      }, 1000); 
     }
 
     return () => {
@@ -135,7 +124,6 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
     };
   }, [activeChat, conversations]);
 
-  // Open specific conversation if selectedMatch is provided
   useEffect(() => {
     if (selectedMatch) {
       setActiveChat(selectedMatch);
@@ -148,7 +136,6 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
 
     try {
       console.log('Messages: Sending message to user:', activeChat.id);
-      // First, get the chat to find chatId
       const response = await axios.get('http://localhost:3000/chat', {
         params: {
           user1Id: currentUserId,
@@ -160,13 +147,11 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
         const chatId = response.data._id;
         console.log('Messages: Found chat ID:', chatId);
 
-        // Send message to backend
         await axios.put(`http://localhost:3000/chat/${chatId}/message`, {
           senderId: currentUserId,
           content: newMessage.trim()
         });
 
-        // Add message to local state immediately for better UX
         const message = {
           id: Date.now(),
           text: newMessage,
@@ -181,7 +166,6 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
 
         setNewMessage('');
 
-        // Award honey for sending message
         if (onSendMessage) {
           onSendMessage();
         }
@@ -190,7 +174,6 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      // Still add to local state for better UX
       const message = {
         id: Date.now(),
         text: newMessage,

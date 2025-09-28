@@ -58,36 +58,43 @@ const Menu = () => {
     console.log('Menu: User is logged in with ID:', currentUserId);
   }, [currentUserId, navigate]);
 
-  // Load user's personalized colony system
   useEffect(() => {
     const loadUserColonies = async () => {
       if (!currentUserId) return;
       
       try {
         console.log('Menu: Loading user colonies...');
+        
+        const { getUserColonyFromTags } = await import('../../services/api');
+        const primaryColony = await getUserColonyFromTags(currentUserId);
+        
+        if (primaryColony && tagColonies[primaryColony]) {
+          setCurrentColony(primaryColony);
+          console.log('Menu: Immediately set primary colony:', primaryColony);
+        }
+        
         const colonyData = await getUserColonies(currentUserId);
         if (colonyData) {
           setUserColonies(colonyData.colonies);
-          setCurrentColony(colonyData.startingColony || 'politics'); // Default to Debate District
-          console.log('Menu: User colonies loaded, starting colony:', colonyData.startingColony);
+          const fullDataColony = colonyData.startingColony || primaryColony;
+          if (fullDataColony !== primaryColony) {
+            setCurrentColony(fullDataColony);
+            console.log('Menu: Updated to full data colony:', fullDataColony);
+          }
         } else {
-          // Fallback to tag-based system
           setUserColonies(tagColonies);
-          setCurrentColony('politics'); // Default to Debate District
-          console.log('Menu: Using fallback tag colonies');
+          console.log('Menu: Using fallback tag colonies with primary colony:', primaryColony);
         }
       } catch (error) {
         console.error('Menu: Error loading user colonies:', error);
-        // Fallback to tag-based system
         setUserColonies(tagColonies);
-        setCurrentColony('politics'); // Default to Debate District
+        setCurrentColony('politics'); 
       }
     };
     
     loadUserColonies();
   }, [currentUserId]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -101,7 +108,6 @@ const Menu = () => {
     };
   }, []);
 
-  // Fetch user data on component mount
   useEffect(() => {
     if (currentUserId) {
       console.log('Menu: Fetching data for user:', currentUserId);
@@ -118,23 +124,21 @@ const Menu = () => {
       const response = await axios.get(`http://localhost:3000/users/${currentUserId}`);
       if (response.data) {
         setHoney(response.data.honey || 10);
-        // Only set colony if it's a valid tag-based colony
+        
         const userCurrentColony = response.data.currentColony;
-        if (userCurrentColony && tagColonies[userCurrentColony]) {
+        if (userCurrentColony && tagColonies[userCurrentColony] && currentColony === 'politics') {
           setCurrentColony(userCurrentColony);
-        } else {
-          setCurrentColony('politics'); // Default to Debate District instead of adventure
+          console.log('Menu: Updated colony from user data:', userCurrentColony);
         }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Use session storage as fallback
       setHoney(parseInt(sessionStorage.getItem('userHoney')) || 10);
-      const sessionColony = sessionStorage.getItem('userColony');
-      if (sessionColony && tagColonies[sessionColony]) {
+      
+      const sessionColony = sessionStorage.getItem('userPrimaryColony') || sessionStorage.getItem('userColony');
+      if (sessionColony && tagColonies[sessionColony] && currentColony === 'politics') {
         setCurrentColony(sessionColony);
-      } else {
-        setCurrentColony('politics'); // Default to Debate District instead of adventure
+        console.log('Menu: Updated colony from session storage:', sessionColony);
       }
     }
   };
@@ -160,7 +164,6 @@ const Menu = () => {
         const profileData = response.data[0];
         console.log('Menu: Profile data:', profileData);
         
-        // Update profile picture from backend (profileData[1] is profileImage)
         if (profileData[1] && profileData[1].trim()) {
           console.log('Menu: Setting profile picture from backend');
           setUserProfilePicture(profileData[1]);
@@ -169,7 +172,6 @@ const Menu = () => {
           setUserProfilePicture(null);
         }
         
-        // Update session storage with latest profile data
         if (profileData[4]) sessionStorage.setItem('userName', profileData[4]);
         if (profileData[5]) sessionStorage.setItem('currentUserEmail', profileData[5]);
         if (profileData[6]) sessionStorage.setItem('userLocation', profileData[6]);
@@ -187,10 +189,8 @@ const Menu = () => {
 
   const fetchSavedMatches = async () => {
     try {
-      // Fetch matches from backend only
       const response = await axios.get(`http://localhost:3000/matches/${currentUserId}`);
       if (response.data && response.data.length > 0) {
-        // For each match, fetch user profile data
         const matchPromises = response.data.map(async (match) => {
           const otherUserId = match.user1Id === currentUserId ? match.user2Id : match.user1Id;
           try {
@@ -201,13 +201,11 @@ const Menu = () => {
             if (profileResponse.data && profileResponse.data.length > 0) {
               const profileData = profileResponse.data[0];
               
-              // Get colony assignment based on database tags
               const { getUserColonyFromTags } = await import('../../services/api');
               let userColony = await getUserColonyFromTags(otherUserId);
               
-              // Ensure valid colony assignment
               if (!userColony || !tagColonies[userColony]) {
-                userColony = 'politics'; // Default to Debate District
+                userColony = 'politics'; 
               }
               
               return {
@@ -240,60 +238,49 @@ const Menu = () => {
   };
 
   const handleSaveMatch = async (user) => {
-    // Check if already matched
     if (savedMatches.find(match => match.id === user.id)) {
       console.log('Already matched with this user');
-      return Promise.resolve(); // Return resolved promise
+      return Promise.resolve(); 
     }
 
     try {
       console.log('Saving match:', user.id, 'Current honey:', honey);
       
-      // Calculate new honey amount first
       const newHoney = honey + 3;
       console.log('New honey amount will be:', newHoney);
       
-      // Update honey immediately in the UI
       setHoney(newHoney);
       
-      // Log the match to the server
       await axios.post('http://localhost:3000/matches', {
         user1Id: currentUserId,
         user2Id: user.id,
         matchedAt: new Date().toISOString()
       });
 
-      // Create a chat between users
       await axios.post('http://localhost:3000/chat', {
         user1Id: currentUserId,
         user2Id: user.id
       });
 
-      // Update local state
       const updatedMatches = [...savedMatches, user];
       setSavedMatches(updatedMatches);
       
-      // Sync honey with backend
       await updateUserData({ honey: newHoney });
       
-      // Also update session storage for persistence
       sessionStorage.setItem('userHoney', newHoney.toString());
       
       console.log('Match saved successfully, honey increased from', honey, 'to', newHoney);
-      return Promise.resolve(); // Explicitly return resolved promise
+      return Promise.resolve(); 
       
     } catch (error) {
       console.error('Error saving match:', error);
       
-      // Calculate new honey amount for fallback
       const newHoney = honey + 3;
       
-      // Fallback - still add to local state and increase honey even if backend fails
       const updatedMatches = [...savedMatches, user];
       setSavedMatches(updatedMatches);
       setHoney(newHoney);
       
-      // Try to update backend anyway
       try {
         await updateUserData({ honey: newHoney });
         sessionStorage.setItem('userHoney', newHoney.toString());
@@ -302,7 +289,7 @@ const Menu = () => {
       }
       
       console.log('Match saved with fallback, honey increased to:', newHoney);
-      return Promise.resolve(); // Return resolved promise even on error
+      return Promise.resolve(); 
     }
   };
 
@@ -363,7 +350,6 @@ const Menu = () => {
     console.log('Menu: Updating profile picture:', !!newPicture);
     setUserProfilePicture(newPicture);
     
-    // Also update in backend immediately
     if (currentUserId) {
       try {
         await axios.put(`http://localhost:3000/profiles/${currentUserId}`, {
@@ -386,7 +372,6 @@ const Menu = () => {
   };
 
   const handleLogout = () => {
-    // Clear session data only
     sessionStorage.removeItem('currentUserId');
     sessionStorage.removeItem('currentUserEmail');
     sessionStorage.removeItem('userName');

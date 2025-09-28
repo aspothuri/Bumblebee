@@ -191,8 +191,7 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
 
         console.log('Feed: Final fetched profiles for colony', currentColony + ':', fetchedProfiles.length);
         setProfiles(fetchedProfiles);
-        // Remove this line that was resetting the index
-        // setCurrentProfileIndex(0); 
+
       } catch (error) {
         console.error('Error fetching compatible users:', error);
         setProfiles([]);
@@ -201,29 +200,25 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
       }
     };
 
-    // Only fetch if we have user colonies loaded
     if (Object.keys(userColonies).length > 0) {
       fetchCompatibleUsers();
     }
   }, [currentUserId, currentColony, userColonies]);
 
-  // Save profile index to session storage whenever it changes
   useEffect(() => {
     if (currentProfileIndex >= 0) {
       sessionStorage.setItem(`profileIndex_${currentColony}`, currentProfileIndex.toString());
     }
   }, [currentProfileIndex, currentColony]);
 
-  // Reset profile index only when we have new profiles and current index is invalid
   useEffect(() => {
     if (profiles.length > 0) {
-      // Only reset if the current index is beyond the available profiles
       if (currentProfileIndex >= profiles.length) {
         console.log('Feed: Current index beyond available profiles, resetting to 0');
         setCurrentProfileIndex(0);
       }
     }
-  }, [profiles.length]); // Only depend on profiles.length, not currentProfileIndex
+  }, [profiles.length]); 
 
   const handleBuzzOff = () => {
     if (!currentProfile || transitioning || profiles.length === 0) return;
@@ -231,7 +226,6 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
     console.log(`Buzzing off ${currentProfile.name}`);
     setTransitioning(true);
     
-    // Calculate next index, cycling back to 0 if we reach the end
     const nextIndex = (currentProfileIndex + 1) % profiles.length;
     console.log(`Feed: Moving from index ${currentProfileIndex} to ${nextIndex} (total: ${profiles.length})`);
     
@@ -247,7 +241,6 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
     console.log(`Matched with ${currentProfile.name}!`);
     setTransitioning(true);
     
-    // Calculate next index before async operations, cycling back to 0 if we reach the end
     const nextIndex = (currentProfileIndex + 1) % profiles.length;
     console.log(`Feed: Moving from index ${currentProfileIndex} to ${nextIndex} after match (total: ${profiles.length})`);
     
@@ -267,7 +260,6 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
       }
     }
     
-    // Move to next profile after a delay
     setTimeout(() => {
       setCurrentProfileIndex(nextIndex);
       setTransitioning(false);

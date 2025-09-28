@@ -10,7 +10,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
   const [loading, setLoading] = useState(true);
   const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
 
-  // Add debugging at component level
   useEffect(() => {
     console.log('Search: Component mounted');
     console.log('Search: Session storage contents:');
@@ -19,10 +18,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
     console.log('- currentUserEmail:', sessionStorage.getItem('currentUserEmail'));
   }, []);
 
-  // Remove hardcoded colonies - will be fetched dynamically
   const [userColonies, setUserColonies] = useState({});
 
-  // Fetch user's personalized colonies
   useEffect(() => {
     const loadUserColonies = async () => {
       if (!currentUserId) return;
@@ -41,7 +38,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
     loadUserColonies();
   }, [currentUserId]);
 
-  // Helper function to get colony info with proper fallback
   const getColonyInfo = (colonyId) => {
     if (!colonyId || colonyId === 'undefined' || colonyId === 'null') {
       return { 
@@ -57,7 +53,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
     };
   };
 
-  // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {
       console.log('Search: Starting fetchUsers...');
@@ -77,7 +72,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
       try {
         let fetchedUsers = [];
         
-        // First try to get compatible users
         try {
           console.log('Search: Attempting compatibility API call...');
           const compatibilityResponse = await axios.get(`http://localhost:3000/profiles/${currentUserId}/compatibility`);
@@ -86,7 +80,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
           if (compatibilityResponse.data && Array.isArray(compatibilityResponse.data) && compatibilityResponse.data.length > 0) {
             console.log('Search: Found compatible users:', compatibilityResponse.data.length);
             
-            // Fetch full profile data for each compatible user
             const userPromises = compatibilityResponse.data.slice(0, 50).map(async (compatibleUser) => {
               try {
                 console.log('Search: Fetching profile for compatible user:', compatibleUser.userId);
@@ -97,11 +90,9 @@ const Search = ({ onSaveMatch, currentColony }) => {
                 if (profileResponse.data && Array.isArray(profileResponse.data) && profileResponse.data.length > 0) {
                   const profileData = profileResponse.data[0];
                   
-                  // Get colony assignment based on database tags
                   const { getUserColonyFromTags } = await import('../../services/api');
                   let userColony = await getUserColonyFromTags(compatibleUser.userId);
                   
-                  // Ensure valid colony assignment
                   if (!userColony || !userColonies[userColony]) {
                     userColony = 'politics'; // Default to Debate District
                   }
@@ -131,7 +122,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
             fetchedUsers = compatibleProfiles.filter(user => user !== null);
             console.log('Search: Compatible profiles after filtering:', fetchedUsers.length);
             
-            // Ensure users are sorted by compatibility in descending order
             fetchedUsers.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
           } else {
             console.log('Search: No compatible users found in response');
@@ -140,7 +130,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
           console.log('Search: Compatibility endpoint failed:', compatibilityError.response?.status, compatibilityError.message);
         }
         
-        // If no compatible users found or compatibility failed, fetch all profiles
         if (fetchedUsers.length === 0) {
           console.log('Search: Fetching all profiles as fallback...');
           
@@ -151,7 +140,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
             if (allProfilesResponse.data && Array.isArray(allProfilesResponse.data) && allProfilesResponse.data.length > 0) {
               console.log('Search: Processing', allProfilesResponse.data.length, 'profiles');
               
-              // Filter out current user and format profiles
               const filteredProfiles = allProfilesResponse.data.filter(profile => {
                 const profileUserId = profile[0];
                 const isCurrentUser = profileUserId === currentUserId;
@@ -162,16 +150,14 @@ const Search = ({ onSaveMatch, currentColony }) => {
               console.log('Search: After filtering current user:', filteredProfiles.length, 'profiles remain');
               
               const profilePromises = filteredProfiles
-                .slice(0, 50) // Limit to first 50 profiles
+                .slice(0, 50) 
                 .map(async (profileData) => {
                   try {
-                    // Get colony assignment based on database tags
                     const { getUserColonyFromTags } = await import('../../services/api');
                     let userColony = await getUserColonyFromTags(profileData[0]);
                     
-                    // Ensure valid colony assignment
                     if (!userColony || !userColonies[userColony]) {
-                      userColony = 'politics'; // Default to Debate District
+                      userColony = 'politics'; 
                     }
                     
                     const formattedProfile = {
@@ -199,7 +185,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
               const allProfiles = await Promise.all(profilePromises);
               fetchedUsers = allProfiles.filter(user => user !== null);
               
-              // Sort fallback profiles by compatibility in descending order  
               fetchedUsers.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
               console.log('Search: Final processed profiles:', fetchedUsers.length);
             } else {
@@ -251,7 +236,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
 
   const handleBuzzOff = (user) => {
     console.log(`Buzzed off ${user.name}`);
-    // Close the profile view and return to search results
     setViewingProfile(null);
   };
 

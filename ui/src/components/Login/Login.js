@@ -26,10 +26,8 @@ function Login() {
       });
 
       if (response.data && response.data.length > 0) {
-        // User found - login successful
         const userData = response.data[0];
         
-        // Store user data in sessionStorage
         sessionStorage.setItem('currentUserId', userData._id);
         sessionStorage.setItem('currentUserEmail', userData.email || username);
         sessionStorage.setItem('userName', userData.name || username);

@@ -25,14 +25,12 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
       if (!validTypes.includes(file.type)) {
         setError('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
         return;
       }
 
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setError('Image size must be less than 5MB');
         return;

@@ -21,7 +21,6 @@ router.get('/', async (req, res) => {
 
     const users = await User.find(filter).select('_id username password');
 
-    // If fullObject is requested, return full objects, otherwise return tuples
     if (fullObject === 'true') {
       res.status(200).json(users);
     } else {

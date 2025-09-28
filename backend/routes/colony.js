@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 
-// Colony definitions
 const colonies = {
     honeycomb: { name: "Honeycomb Heights", color: "#ffc107", unlocked: true, cost: 0 },
     meadow: { name: "Meadow Fields", color: "#4caf50", unlocked: false, cost: 15 },
@@ -12,7 +11,6 @@ const colonies = {
     ocean: { name: "Ocean Breeze", color: "#00bcd4", unlocked: false, cost: 35 }
 };
 
-// GET /colonies - Get all colonies
 router.get('/', (req, res) => {
     try {
         res.status(200).json(colonies);
@@ -97,7 +95,6 @@ router.post('/:userId/unlock', async (req, res) => {
             });
         }
 
-        // Check if user has unlocked adjacent colonies
         const mapLayout = {
             honeycomb: { connections: ['meadow', 'sunset'] },
             meadow: { connections: ['honeycomb', 'forest'] },
@@ -115,7 +112,6 @@ router.post('/:userId/unlock', async (req, res) => {
             return res.status(400).json({ message: 'Must unlock adjacent colonies first' });
         }
 
-        // Deduct honey and unlock colony
         user.honey -= colony.cost;
         user.unlockedColonies.push(colonyId);
         await user.save();
