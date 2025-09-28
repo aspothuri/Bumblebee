@@ -13,8 +13,18 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     forest: false,
     ocean: false,
   });
-  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
+  const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
   const [loading, setLoading] = useState(false);
+
+  // Simple adjacency map for colonies
+  const colonyConnections = {
+    honeycomb: ['meadow', 'sunset'],
+    meadow: ['honeycomb', 'crystal', 'forest'],
+    sunset: ['honeycomb', 'crystal', 'ocean'],
+    crystal: ['meadow', 'sunset', 'forest', 'ocean'],
+    forest: ['meadow', 'crystal'],
+    ocean: ['sunset', 'crystal'],
+  };
 
   // 🔹 BFS shortest path finder
   const findShortestPath = (start, end) => {
@@ -42,49 +52,85 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
   // Load user's colony status on component mount
   useEffect(() => {
     const loadColonyStatus = async () => {
-      if (currentUserId) {
-        try {
-          const status = await colonyAPI.getUserColonyStatus(currentUserId);
-          if (status) {
-            const unlocked = {};
-            status.unlockedColonies.forEach(colonyId => {
-              unlocked[colonyId] = true;
-            });
-            setUnlockedColonies(unlocked);
-            onHoneyChange(status.honey);
+      console.log('Map: Loading colony status for user:', currentUserId);
+
+      // For now, use simple logic - just unlock adjacent colonies
+      // You can enhance this to call your backend later
+      const getUnlockedColonies = () => {
+        const unlocked = { honeycomb: true }; // Always start with honeycomb
+
+        // Check if we have stored unlocked colonies
+        const stored = sessionStorage.getItem('unlockedColonies');
+        if (stored) {
+          try {
+            const storedUnlocked = JSON.parse(stored);
+            Object.assign(unlocked, storedUnlocked);
+          } catch (e) {
+            console.log('Error parsing stored colonies');
           }
-        } catch (error) {
-          console.error('Error loading colony status:', error);
         }
-      }
+
+        return unlocked;
+      };
+
+      const unlocked = getUnlockedColonies();
+      console.log('Map: Loaded unlocked colonies:', unlocked);
+      setUnlockedColonies(unlocked);
     };
 
     loadColonyStatus();
-  }, [currentUserId, onHoneyChange]);
+  }, [currentUserId]);
 
   const handleColonyClick = async (colonyId) => {
     if (loading) return;
 
     const colony = colonies[colonyId];
-    if (!isColonyAccessible(colonyId)) return;
+    if (!isColonyAccessible(colonyId)) {
+      console.log('Map: Colony not accessible:', colonyId);
+      return;
+    }
 
-    const path = findShortestPath(currentColony, colonyId);
+    console.log(
+      'Map: Handling colony click:',
+      colonyId,
+      'unlocked?',
+      unlockedColonies[colonyId]
+    );
 
     if (unlockedColonies[colonyId]) {
-      if (colonyId !== currentColony && path) {
-        setTravelingBee({ path, index: 0 });
+      // Already unlocked, just travel there
+      if (colonyId !== currentColony) {
+        console.log('Map: Traveling to unlocked colony:', colonyId);
+        onColonyChange(colonyId);
       }
     } else if (honey >= colony.cost) {
+      // Can afford to unlock
       setLoading(true);
       try {
-        const result = await colonyAPI.unlockColony(currentUserId, colonyId);
-        if (result.success) {
-          setUnlockedColonies((prev) => ({ ...prev, [colonyId]: true }));
-          onHoneyChange(result.data.honey);
-          if (path) setTravelingBee({ path, index: 0 });
-        } else {
-          alert(result.message);
-        }
+        console.log(
+          'Map: Unlocking colony:',
+          colonyId,
+          'for',
+          colony.cost,
+          'honey'
+        );
+
+        // Unlock the colony
+        const newUnlocked = { ...unlockedColonies, [colonyId]: true };
+        setUnlockedColonies(newUnlocked);
+
+        // Store in session storage
+        sessionStorage.setItem('unlockedColonies', JSON.stringify(newUnlocked));
+
+        // Deduct honey
+        const newHoney = honey - colony.cost;
+        onHoneyChange(newHoney);
+        sessionStorage.setItem('userHoney', newHoney.toString());
+
+        // Travel to the newly unlocked colony
+        onColonyChange(colonyId);
+
+        console.log('Map: Successfully unlocked and traveled to:', colonyId);
       } catch (error) {
         console.error('Error unlocking colony:', error);
         alert('Failed to unlock colony. Please try again.');
@@ -100,7 +146,9 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
 
   const isColonyAccessible = (colonyId) => {
     if (unlockedColonies[colonyId]) return true;
-    const connections = mapLayout[colonyId].connections;
+
+    // Check if any connected colony is unlocked
+    const connections = colonyConnections[colonyId] || [];
     return connections.some((connectedId) => unlockedColonies[connectedId]);
   };
 
@@ -159,7 +207,12 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
         >
           {/* Background patterns */}
           <defs>
-            <pattern id="hexPattern" patternUnits="userSpaceOnUse" width="6" height="6">
+            <pattern
+              id="hexPattern"
+              patternUnits="userSpaceOnUse"
+              width="6"
+              height="6"
+            >
               <polygon
                 points="3,0.5 5.5,1.5 5.5,4.5 3,5.5 0.5,4.5 0.5,1.5"
                 fill="none"
@@ -168,7 +221,12 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                 opacity="0.6"
               />
             </pattern>
-            <pattern id="hexPatternDense" patternUnits="userSpaceOnUse" width="4" height="4">
+            <pattern
+              id="hexPatternDense"
+              patternUnits="userSpaceOnUse"
+              width="4"
+              height="4"
+            >
               <polygon
                 points="2,0.3 3.3,1 3.3,3 2,3.7 0.7,3 0.7,1"
                 fill="none"
@@ -191,10 +249,11 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                 y1={data.y}
                 x2={mapLayout[connectedId].x}
                 y2={mapLayout[connectedId].y}
-                className={`road ${unlockedColonies[colonyId] && unlockedColonies[connectedId]
+                className={`road ${
+                  unlockedColonies[colonyId] && unlockedColonies[connectedId]
                     ? 'road-unlocked'
                     : 'road-locked'
-                  }`}
+                }`}
                 strokeWidth="1.2"
               />
             ))
@@ -216,14 +275,15 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                            ${position.x},${position.y + 5} 
                            ${position.x - 4.5},${position.y + 2.5} 
                            ${position.x - 4.5},${position.y - 2.5}`}
-                  className={`colony ${isCurrent
+                  className={`colony ${
+                    isCurrent
                       ? 'colony-current'
                       : isUnlocked
-                        ? 'colony-unlocked'
-                        : isAccessible
-                          ? 'colony-locked'
-                          : 'colony-inaccessible'
-                    }`}
+                      ? 'colony-unlocked'
+                      : isAccessible
+                      ? 'colony-locked'
+                      : 'colony-inaccessible'
+                  }`}
                   onClick={() => isAccessible && handleColonyClick(colonyId)}
                   onMouseEnter={() => setHoveredColony(colonyId)}
                   onMouseLeave={() => setHoveredColony(null)}

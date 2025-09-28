@@ -363,7 +363,7 @@ const Menu = () => {
 
     switch (activeView) {
       case 'feed':
-        return <Feed onSaveMatch={handleSaveMatch} currentColony={currentColony} />;
+        return <Feed onSaveMatch={handleSaveMatch} currentColony={currentColony} savedMatches={savedMatches} />;
       case 'search':
         return <Search onSaveMatch={handleSaveMatch} currentColony={currentColony} />;
       case 'profile':

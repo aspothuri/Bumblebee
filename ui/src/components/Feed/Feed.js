@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './Feed.css';
 
-const Feed = ({ onSaveMatch, currentColony }) => {
+const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
   const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +35,7 @@ const Feed = ({ onSaveMatch, currentColony }) => {
       console.log('Feed: Starting fetchCompatibleUsers...');
       console.log('Feed: currentUserId state:', currentUserId);
       console.log('Feed: currentUserId from session:', sessionStorage.getItem('currentUserId'));
+      console.log('Feed: Current saved matches:', savedMatches.map(m => m.id));
 
       if (!currentUserId) {
         console.log('Feed: No currentUserId found - user may not be logged in');
@@ -47,6 +48,9 @@ const Feed = ({ onSaveMatch, currentColony }) => {
       try {
         let fetchedProfiles = [];
         
+        // Get list of saved match IDs to exclude
+        const savedMatchIds = savedMatches.map(match => match.id);
+        
         // First try to get compatible users
         try {
           console.log('Feed: Attempting compatibility API call...');
@@ -56,8 +60,14 @@ const Feed = ({ onSaveMatch, currentColony }) => {
           if (compatibilityResponse.data && compatibilityResponse.data.length > 0) {
             console.log('Feed: Found compatible users:', compatibilityResponse.data.length);
             
+            // Filter out saved matches first
+            const availableCompatibleUsers = compatibilityResponse.data.filter(user => 
+              !savedMatchIds.includes(user.userId)
+            );
+            console.log('Feed: Compatible users after excluding saved matches:', availableCompatibleUsers.length);
+            
             // Fetch full profile data for compatible users
-            const profilePromises = compatibilityResponse.data.slice(0, 10).map(async (compatibleUser) => {
+            const profilePromises = availableCompatibleUsers.slice(0, 10).map(async (compatibleUser) => {
               try {
                 console.log('Feed: Fetching profile for compatible user:', compatibleUser.userId);
                 const profileResponse = await axios.get('http://localhost:3000/profiles', {
@@ -106,12 +116,13 @@ const Feed = ({ onSaveMatch, currentColony }) => {
             console.log('Feed: All profiles response:', allProfilesResponse.data?.length || 0, 'profiles found');
             
             if (allProfilesResponse.data && allProfilesResponse.data.length > 0) {
-              // Filter out current user and format profiles
+              // Filter out current user and saved matches
               const profilePromises = allProfilesResponse.data
                 .filter(profile => {
                   const isCurrentUser = profile[0] === currentUserId;
-                  console.log('Feed: Profile', profile[0], 'is current user?', isCurrentUser);
-                  return !isCurrentUser;
+                  const isAlreadySaved = savedMatchIds.includes(profile[0]);
+                  console.log('Feed: Profile', profile[0], 'is current user?', isCurrentUser, 'is already saved?', isAlreadySaved);
+                  return !isCurrentUser && !isAlreadySaved;
                 })
                 .slice(0, 10)
                 .map(async (profileData) => {
@@ -151,7 +162,7 @@ const Feed = ({ onSaveMatch, currentColony }) => {
     };
 
     fetchCompatibleUsers();
-  }, [currentUserId, currentColony]);
+  }, [currentUserId, currentColony, savedMatches]);
 
   const handleBuzzOff = () => {
     if (currentProfileIndex < profiles.length - 1) {

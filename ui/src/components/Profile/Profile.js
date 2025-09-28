@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { colonies, profileAPI, utils } from '../../services/api';
 import './Profile.css';
+import axios from 'axios';
+
 
 const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -8,14 +10,14 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
   const [previewImage, setPreviewImage] = useState(userProfilePicture);
   const [error, setError] = useState('');
   const [profileData, setProfileData] = useState({
-    name: localStorage.getItem('userName') || 'John Doe',
-    email: localStorage.getItem('userEmail') || 'john@example.com',
-    age: localStorage.getItem('userAge') || '25',
-    location: localStorage.getItem('userLocation') || 'San Francisco, CA',
-    description: localStorage.getItem('userDescription') || 'Love exploring new places and meeting new people!',
-    interests: JSON.parse(localStorage.getItem('userInterests') || '["Travel", "Photography", "Coffee"]')
+    name: sessionStorage.getItem('userName') || 'John Doe',
+    email: sessionStorage.getItem('currentUserEmail') || 'john@example.com',
+    age: sessionStorage.getItem('userAge') || '25',
+    location: sessionStorage.getItem('userLocation') || 'San Francisco, CA',
+    description: sessionStorage.getItem('userDescription') || 'Love exploring new places and meeting new people!',
+    interests: JSON.parse(sessionStorage.getItem('userInterests') || '["Travel", "Photography", "Coffee"]')
   });
-  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
+  const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
 
   useEffect(() => {
     setPreviewImage(userProfilePicture);
@@ -66,34 +68,54 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
 
   const handleSaveProfile = async () => {
     try {
+      console.log('Profile: Saving profile changes...');
+      
       // Save to backend
       if (currentUserId) {
-        const result = await profileAPI.createProfile(currentUserId, {
+        const profileUpdateData = {
           profileImage: previewImage,
           age: parseInt(profileData.age),
-          Description: profileData.description
-        });
-
-        if (result.success) {
-          // Save to localStorage for immediate UI updates
-          utils.setCurrentUser({
-            id: currentUserId,
-            username: profileData.email,
-            name: profileData.name,
-            age: profileData.age,
-            location: profileData.location,
-            description: profileData.description,
-            interests: profileData.interests,
-            profilePicture: previewImage
-          });
-
-          setIsEditing(false);
-        } else {
-          console.error('Failed to save profile:', result.message);
+          Description: profileData.description,
+          name: profileData.name,
+          email: profileData.email,
+          location: profileData.location
+        };
+        
+        console.log('Profile: Sending update data:', profileUpdateData);
+        
+        try {
+          const response = await axios.put(`http://localhost:3000/profiles/${currentUserId}`, profileUpdateData);
+          console.log('Profile: Backend update successful:', response.data);
+        } catch (backendError) {
+          console.error('Profile: Backend update failed:', backendError);
+          // Continue with local storage update even if backend fails
         }
+
+        // Save to sessionStorage for immediate UI updates
+        sessionStorage.setItem('userName', profileData.name);
+        sessionStorage.setItem('currentUserEmail', profileData.email);
+        sessionStorage.setItem('userAge', profileData.age.toString());
+        sessionStorage.setItem('userLocation', profileData.location);
+        sessionStorage.setItem('userDescription', profileData.description);
+        sessionStorage.setItem('userInterests', JSON.stringify(profileData.interests));
+        
+        console.log('Profile: Session storage updated');
+
+        // Update parent component with new profile picture
+        if (onProfilePictureUpdate && previewImage !== userProfilePicture) {
+          onProfilePictureUpdate(previewImage);
+        }
+
+        // Exit editing mode
+        setIsEditing(false);
+        console.log('Profile: Profile saved successfully');
+      } else {
+        console.error('Profile: No current user ID found');
+        alert('Error: User not logged in');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
+      alert('Failed to save profile. Please try again.');
     }
   };
 
