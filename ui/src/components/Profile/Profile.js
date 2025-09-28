@@ -14,8 +14,7 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
     email: sessionStorage.getItem('currentUserEmail') || 'john@example.com',
     age: sessionStorage.getItem('userAge') || '25',
     location: sessionStorage.getItem('userLocation') || 'San Francisco, CA',
-    description: sessionStorage.getItem('userDescription') || 'Love exploring new places and meeting new people!',
-    interests: JSON.parse(sessionStorage.getItem('userInterests') || '["Travel", "Photography", "Coffee"]')
+    description: sessionStorage.getItem('userDescription') || 'Love exploring new places and meeting new people!'
   });
   const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
 
@@ -97,7 +96,6 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
         sessionStorage.setItem('userAge', profileData.age.toString());
         sessionStorage.setItem('userLocation', profileData.location);
         sessionStorage.setItem('userDescription', profileData.description);
-        sessionStorage.setItem('userInterests', JSON.stringify(profileData.interests));
         
         console.log('Profile: Session storage updated');
 
@@ -238,15 +236,6 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
             </div>
           </div>
 
-          <div className="profile-field">
-            <label>Interests</label>
-            <div className="interests-display">
-              {profileData.interests.map((interest, index) => (
-                <span key={index} className="interest-tag">{interest}</span>
-              ))}
-            </div>
-          </div>
-
           {isEditing && (
             <div className="profile-actions">
               <button className="save-btn" onClick={handleSaveProfile}>
@@ -310,5 +299,6 @@ const Profile = ({ currentColony, userProfilePicture, onProfilePictureUpdate }) 
     </div>
   );
 };
+
 
 export default Profile;

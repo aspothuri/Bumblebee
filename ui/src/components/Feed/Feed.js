@@ -87,7 +87,6 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
                     occupation: 'Professional',
                     education: 'University',
                     height: '5\'10"',
-                    interests: ['Technology', 'Music', 'Travel'],
                     compatibility: compatibleUser.compatibility
                   };
                 }
@@ -137,7 +136,6 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
                     occupation: 'Professional',
                     education: 'University',
                     height: '5\'10"',
-                    interests: ['Technology', 'Music', 'Travel'],
                     compatibility: Math.floor(Math.random() * 40) + 60
                   };
                 });
@@ -276,15 +274,6 @@ const Feed = ({ onSaveMatch, currentColony, savedMatches = [] }) => {
               <div className="stat-item">
                 <span className="stat-label">Height:</span>
                 <span className="stat-value">{currentProfile.height}</span>
-              </div>
-            </div>
-            
-            <div className="profile-interests">
-              <h4>Interests</h4>
-              <div className="interests-list">
-                {currentProfile.interests.map((interest, index) => (
-                  <span key={index} className="interest-item">{interest}</span>
-                ))}
               </div>
             </div>
           </div>

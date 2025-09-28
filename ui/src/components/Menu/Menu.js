@@ -142,8 +142,7 @@ const Menu = () => {
                 photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
                 occupation: 'Professional',
                 education: 'University',
-                height: '5\'10"',
-                interests: ['Technology', 'Music', 'Travel']
+                height: '5\'10"'
               };
             }
           } catch (error) {
@@ -342,15 +341,6 @@ const Menu = () => {
                     <div className="stat-item">
                       <span className="stat-label">Height:</span>
                       <span className="stat-value">{viewingProfile.height}</span>
-                    </div>
-                  </div>
-
-                  <div className="profile-interests">
-                    <h4>Interests</h4>
-                    <div className="interests-list">
-                      {viewingProfile.interests.map((interest, index) => (
-                        <span key={index} className="interest-item">{interest}</span>
-                      ))}
                     </div>
                   </div>
                 </div>

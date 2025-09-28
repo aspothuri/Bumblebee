@@ -84,7 +84,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
                     occupation: 'Professional',
                     education: 'University',
                     height: '5\'10"',
-                    interests: ['Technology', 'Music', 'Travel'],
                     compatibility: compatibleUser.compatibility
                   };
                 }
@@ -145,7 +144,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
                       occupation: 'Professional',
                       education: 'University',
                       height: '5\'10"',
-                      interests: ['Technology', 'Music', 'Travel'],
                       compatibility: Math.floor(Math.random() * 40) + 60 // Random compatibility 60-100%
                     };
                     
@@ -328,15 +326,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
                     <span className="stat-value">{viewingProfile.height}</span>
                   </div>
                 </div>
-                
-                <div className="profile-interests">
-                  <h4>Interests</h4>
-                  <div className="interests-list">
-                    {viewingProfile.interests.map((interest, index) => (
-                      <span key={index} className="interest-item">{interest}</span>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
             
@@ -405,5 +394,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
     </div>
   );
 };
+
 
 export default Search;

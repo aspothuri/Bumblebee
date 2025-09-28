@@ -13,18 +13,12 @@ function Signup() {
     age: '',
     location: '',
     description: '',
-    interests: [],
     profilePicture: null
   });
 
   const [errors, setErrors] = useState({});
   const [previewImage, setPreviewImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [availableInterests] = useState([
-    'Technology', 'Art', 'Music', 'Sports', 'Travel', 'Cooking', 'Reading',
-    'Photography', 'Dancing', 'Hiking', 'Gaming', 'Fitness', 'Movies',
-    'Fashion', 'Food', 'Nature', 'Writing', 'Yoga', 'Adventure', 'Coffee'
-  ]);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -32,15 +26,6 @@ function Signup() {
     setFormData(prev => ({
       ...prev,
       [name]: value
-    }));
-  };
-
-  const handleInterestToggle = (interest) => {
-    setFormData(prev => ({
-      ...prev,
-      interests: prev.interests.includes(interest)
-        ? prev.interests.filter(i => i !== interest)
-        : [...prev.interests, interest]
     }));
   };
 
@@ -142,10 +127,6 @@ function Signup() {
       newErrors.description = 'Description should be at least 20 characters';
     }
 
-    if (formData.interests.length < 3) {
-      newErrors.interests = 'Please select at least 3 interests';
-    }
-
     return newErrors;
   };
 
@@ -190,6 +171,9 @@ function Signup() {
             sessionStorage.setItem('currentUserId', userId);
             sessionStorage.setItem('currentUserEmail', formData.email);
             sessionStorage.setItem('userName', formData.name);
+            sessionStorage.setItem('userAge', formData.age.toString());
+            sessionStorage.setItem('userLocation', formData.location);
+            sessionStorage.setItem('userDescription', formData.description);
             sessionStorage.setItem('userHoney', '10');
             sessionStorage.setItem('userColony', 'honeycomb');
 
@@ -377,24 +361,6 @@ function Signup() {
             />
             {errors.description && <span className="error-message">{errors.description}</span>}
             <small className="helper-text">This helps us understand you better (minimum 20 characters)</small>
-          </div>
-
-          <div className="form-group">
-            <label>Select Your Interests (minimum 3)</label>
-            <div className="interests-grid">
-              {availableInterests.map(interest => (
-                <button
-                  key={interest}
-                  type="button"
-                  onClick={() => handleInterestToggle(interest)}
-                  className={`interest-chip ${formData.interests.includes(interest) ? 'selected' : ''}`}
-                >
-                  {interest}
-                </button>
-              ))}
-            </div>
-            {errors.interests && <span className="error-message">{errors.interests}</span>}
-            <small className="helper-text">Selected: {formData.interests.length}</small>
           </div>
 
           <button type="submit" className="signup-button" disabled={loading}>
