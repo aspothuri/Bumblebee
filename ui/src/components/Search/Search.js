@@ -32,10 +32,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
   // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {
-      // Debug session storage
       console.log('Search: Starting fetchUsers...');
       console.log('Search: currentUserId state:', currentUserId);
-      console.log('Search: currentUserId from session:', sessionStorage.getItem('currentUserId'));
       
       if (!currentUserId) {
         console.log('Search: No currentUserId found - user may not be logged in');
@@ -47,6 +45,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
       
       console.log('Search: Starting fetch for currentUserId:', currentUserId);
       setLoading(true);
+      
       try {
         let fetchedUsers = [];
         
@@ -56,19 +55,18 @@ const Search = ({ onSaveMatch, currentColony }) => {
           const compatibilityResponse = await axios.get(`http://localhost:3000/profiles/${currentUserId}/compatibility`);
           console.log('Search: Compatibility response:', compatibilityResponse.data);
           
-          if (compatibilityResponse.data && compatibilityResponse.data.length > 0) {
+          if (compatibilityResponse.data && Array.isArray(compatibilityResponse.data) && compatibilityResponse.data.length > 0) {
             console.log('Search: Found compatible users:', compatibilityResponse.data.length);
             
             // Fetch full profile data for each compatible user
-            const userPromises = compatibilityResponse.data.slice(0, 20).map(async (compatibleUser) => {
+            const userPromises = compatibilityResponse.data.slice(0, 50).map(async (compatibleUser) => {
               try {
                 console.log('Search: Fetching profile for compatible user:', compatibleUser.userId);
                 const profileResponse = await axios.get('http://localhost:3000/profiles', {
                   params: { searchUserId: compatibleUser.userId }
                 });
-                console.log('Search: Profile response for user', compatibleUser.userId, ':', profileResponse.data);
                 
-                if (profileResponse.data && profileResponse.data.length > 0) {
+                if (profileResponse.data && Array.isArray(profileResponse.data) && profileResponse.data.length > 0) {
                   const profileData = profileResponse.data[0];
                   const colonyKeys = Object.keys(colonies);
                   const randomColony = colonyKeys[Math.floor(Math.random() * colonyKeys.length)];
@@ -84,7 +82,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                     occupation: 'Professional',
                     education: 'University',
                     height: '5\'10"',
-                    compatibility: compatibleUser.compatibility
+                    compatibility: Math.round(compatibleUser.compatibility) || 75
                   };
                 }
                 return null;
@@ -102,7 +100,6 @@ const Search = ({ onSaveMatch, currentColony }) => {
           }
         } catch (compatibilityError) {
           console.log('Search: Compatibility endpoint failed:', compatibilityError.response?.status, compatibilityError.message);
-          console.log('Search: Falling back to all profiles...');
         }
         
         // If no compatible users found or compatibility failed, fetch all profiles
@@ -112,22 +109,22 @@ const Search = ({ onSaveMatch, currentColony }) => {
           try {
             const allProfilesResponse = await axios.get('http://localhost:3000/profiles');
             console.log('Search: All profiles response:', allProfilesResponse.data?.length || 0, 'profiles found');
-            console.log('Search: Sample profile data:', allProfilesResponse.data?.[0]);
             
-            if (allProfilesResponse.data && allProfilesResponse.data.length > 0) {
+            if (allProfilesResponse.data && Array.isArray(allProfilesResponse.data) && allProfilesResponse.data.length > 0) {
               console.log('Search: Processing', allProfilesResponse.data.length, 'profiles');
               
               // Filter out current user and format profiles
               const filteredProfiles = allProfilesResponse.data.filter(profile => {
-                const isCurrentUser = profile[0] === currentUserId;
-                console.log('Search: Profile', profile[0], 'is current user?', isCurrentUser);
-                return !isCurrentUser;
+                const profileUserId = profile[0];
+                const isCurrentUser = profileUserId === currentUserId;
+                console.log('Search: Profile', profileUserId, 'is current user?', isCurrentUser);
+                return !isCurrentUser && profileUserId && profileUserId !== 'UNKNOWN_USER';
               });
               
               console.log('Search: After filtering current user:', filteredProfiles.length, 'profiles remain');
               
               const profilePromises = filteredProfiles
-                .slice(0, 20)
+                .slice(0, 50) // Limit to first 50 profiles
                 .map(async (profileData) => {
                   try {
                     const colonyKeys = Object.keys(colonies);
@@ -135,7 +132,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                     
                     const formattedProfile = {
                       id: profileData[0],
-                      name: profileData[4] || profileData[0], // Use name or fallback to userId
+                      name: profileData[4] || 'Anonymous User',
                       age: profileData[2] || 25,
                       bio: profileData[3] || 'Looking for meaningful connections!',
                       location: profileData[6] || 'City, State',
@@ -147,7 +144,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                       compatibility: Math.floor(Math.random() * 40) + 60 // Random compatibility 60-100%
                     };
                     
-                    console.log('Search: Formatted profile:', formattedProfile);
+                    console.log('Search: Formatted profile:', formattedProfile.name, formattedProfile.id);
                     return formattedProfile;
                   } catch (error) {
                     console.error('Error formatting profile:', error);
@@ -159,7 +156,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
               fetchedUsers = allProfiles.filter(user => user !== null);
               console.log('Search: Final processed profiles:', fetchedUsers.length);
             } else {
-              console.log('Search: No profiles found in database');
+              console.log('Search: No profiles found in database response');
             }
           } catch (allProfilesError) {
             console.error('Search: Failed to fetch all profiles:', allProfilesError.response?.status, allProfilesError.message);
@@ -167,6 +164,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
         }
         
         console.log('Search: Final fetched users count:', fetchedUsers.length);
+        console.log('Search: Sample users:', fetchedUsers.slice(0, 3).map(u => ({name: u.name, id: u.id})));
+        
         setAllUsers(fetchedUsers);
         setFilteredUsers(fetchedUsers);
         
@@ -211,7 +210,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
       <div className="search-container">
         <div className="loading">
           <div className="loading-icon">🐝</div>
-          <p>Finding users in your area...</p>
+          <p>Searching for users in the hive...</p>
         </div>
       </div>
     );
@@ -245,11 +244,21 @@ const Search = ({ onSaveMatch, currentColony }) => {
         <div className="search-results">
           <div className="no-results">
             <div className="no-results-icon">🐝</div>
-            <h3>No profiles found!</h3>
-            <p>It looks like there are no other users in the database yet.</p>
-            <p>Current User ID: {currentUserId}</p>
+            <h3>No matches found!</h3>
+            {searchTerm ? (
+              <p>No users match your search for "{searchTerm}". Try a different search term.</p>
+            ) : (
+              <>
+                <p>No other users found in the database.</p>
+                <p>Current User ID: {currentUserId}</p>
+                <p>Try creating more user accounts through the signup page.</p>
+              </>
+            )}
             <button 
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                setSearchTerm('');
+                window.location.reload();
+              }}
               style={{ 
                 padding: '10px 20px', 
                 marginTop: '10px',
@@ -259,7 +268,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                 cursor: 'pointer'
               }}
             >
-              🔄 Refresh
+              🔄 Refresh Search
             </button>
           </div>
         </div>
