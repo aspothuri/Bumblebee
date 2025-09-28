@@ -1,27 +1,113 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import './Messages.css';
 
 const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMessage }) => {
   const [activeChat, setActiveChat] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState({});
+  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
 
-  // Initialize conversations with sample messages
-  const initializeConversation = (userId) => {
-    if (!conversations[userId]) {
-      setConversations(prev => ({
-        ...prev,
-        [userId]: [
-          {
-            id: 1,
-            text: "Hey! Great to match with you! 🐝",
-            sender: 'them',
-            timestamp: new Date(Date.now() - 3600000)
+  // Initialize conversations by fetching from backend
+  const initializeConversation = async (userId) => {
+    if (!conversations[userId] && currentUserId) {
+      try {
+        // Try to get existing chat
+        const response = await axios.get('http://localhost:3000/chat', {
+          params: {
+            user1Id: currentUserId,
+            user2Id: userId
           }
-        ]
-      }));
+        });
+
+        if (response.status === 200) {
+          // Chat exists, format messages
+          const messages = response.data.messages.map((msg, index) => ({
+            id: index,
+            text: msg[1], // content
+            sender: msg[0] === currentUserId ? 'me' : 'them',
+            timestamp: new Date()
+          }));
+
+          setConversations(prev => ({
+            ...prev,
+            [userId]: messages
+          }));
+        }
+      } catch (error) {
+        if (error.response?.status === 404) {
+          // Chat doesn't exist, create new one
+          try {
+            await axios.post('http://localhost:3000/chat', {
+              user1Id: currentUserId,
+              user2Id: userId
+            });
+
+            // Initialize with empty conversation
+            setConversations(prev => ({
+              ...prev,
+              [userId]: []
+            }));
+          } catch (createError) {
+            console.error('Error creating chat:', createError);
+          }
+        } else {
+          console.error('Error fetching chat:', error);
+        }
+      }
     }
   };
+
+  // Function to fetch new messages from backend
+  const fetchNewMessages = async () => {
+    if (!activeChat || !currentUserId) return;
+    
+    try {
+      const response = await axios.get('http://localhost:3000/chat', {
+        params: {
+          user1Id: currentUserId,
+          user2Id: activeChat.id
+        }
+      });
+
+      if (response.status === 200) {
+        const messages = response.data.messages.map((msg, index) => ({
+          id: index,
+          text: msg[1], // content
+          sender: msg[0] === currentUserId ? 'me' : 'them',
+          timestamp: new Date()
+        }));
+
+        // Only update if there are new messages
+        const currentMessages = conversations[activeChat.id] || [];
+        if (messages.length > currentMessages.length) {
+          setConversations(prev => ({
+            ...prev,
+            [activeChat.id]: messages
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching new messages:', error);
+    }
+  };
+
+  // Auto-refresh effect - check for new messages every second
+  useEffect(() => {
+    let intervalId;
+    
+    if (activeChat) {
+      intervalId = setInterval(() => {
+        fetchNewMessages();
+      }, 1000); // Refresh every 1 second
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [activeChat, conversations]);
 
   // Open specific conversation if selectedMatch is provided
   useEffect(() => {
@@ -31,26 +117,49 @@ const Messages = ({ savedMatches, onViewProfile, onBack, selectedMatch, onSendMe
     }
   }, [selectedMatch]);
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !activeChat) return;
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !activeChat || !currentUserId) return;
 
-    const message = {
-      id: Date.now(),
-      text: newMessage,
-      sender: 'me',
-      timestamp: new Date()
-    };
+    try {
+      // First, get the chat to find chatId
+      const chatResponse = await axios.get('http://localhost:3000/chat', {
+        params: {
+          user1Id: currentUserId,
+          user2Id: activeChat.id
+        }
+      });
 
-    setConversations(prev => ({
-      ...prev,
-      [activeChat.id]: [...(prev[activeChat.id] || []), message]
-    }));
+      if (chatResponse.status === 200) {
+        const chatId = chatResponse.data._id;
 
-    setNewMessage('');
-    
-    // Award honey for sending message
-    if (onSendMessage) {
-      onSendMessage();
+        // Send message to backend
+        await axios.put(`http://localhost:3000/chat/${chatId}/message`, {
+          senderId: currentUserId,
+          content: newMessage.trim()
+        });
+
+        // Add message to local state immediately for better UX
+        const message = {
+          id: Date.now(),
+          text: newMessage,
+          sender: 'me',
+          timestamp: new Date()
+        };
+
+        setConversations(prev => ({
+          ...prev,
+          [activeChat.id]: [...(prev[activeChat.id] || []), message]
+        }));
+
+        setNewMessage('');
+        
+        // Award honey for sending message
+        if (onSendMessage) {
+          onSendMessage();
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
     }
   };
 

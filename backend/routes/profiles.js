@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-const { generateTagsFromDescription } = require('../utils/tagging.js');
+const { generateTags } = require('../utils/tagging.js');
 const Tag = require('../models/Tag');
 const { getCompatibleUsers } = require('../utils/compatibility');
 
@@ -49,7 +49,7 @@ router.post('/:userId', async (req, res) => {
         user: userId, 
         profileImage,
         age,
-        Description
+        description: Description
     });
 
     try {
@@ -58,8 +58,8 @@ router.post('/:userId', async (req, res) => {
 
         // Step 2: generate tags from description
         let tags = {};
-        if (description) {
-            tags = await generateTagsFromDescription(description);
+        if (Description) {
+            tags = await generateTags(Description);
         }
 
         // Step 3: save tags to DB if valid

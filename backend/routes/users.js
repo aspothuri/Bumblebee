@@ -6,7 +6,7 @@ const User = require('../models/User');
 router.get('/', async (req, res) => {
     console.log('Received Query:', req.query);
   try {
-    const { search, passwordSearch } = req.query;
+    const { search, passwordSearch, fullObject } = req.query;
 
     const filter = {};
 
@@ -19,11 +19,15 @@ router.get('/', async (req, res) => {
       filter.password = passwordSearch;
     }
 
-    const users = await User.find(filter).select('username password');
+    const users = await User.find(filter).select('_id username password');
 
-    const userTuples = users.map(user => [user.username, user.password]);
-
-    res.status(200).json(userTuples);
+    // If fullObject is requested, return full objects, otherwise return tuples
+    if (fullObject === 'true') {
+      res.status(200).json(users);
+    } else {
+      const userTuples = users.map(user => [user.username, user.password]);
+      res.status(200).json(userTuples);
+    }
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Internal Server Error' });

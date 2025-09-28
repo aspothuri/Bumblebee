@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import './Signup.css';
 
 function Signup() {
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -17,6 +19,7 @@ function Signup() {
 
   const [errors, setErrors] = useState({});
   const [previewImage, setPreviewImage] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [availableInterests] = useState([
     'Technology', 'Art', 'Music', 'Sports', 'Travel', 'Cooking', 'Reading', 
     'Photography', 'Dancing', 'Hiking', 'Gaming', 'Fitness', 'Movies', 
@@ -101,6 +104,14 @@ function Signup() {
       newErrors.name = 'Name is required';
     }
 
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      newErrors.username = 'Username can only contain letters, numbers, and underscores';
+    }
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -138,34 +149,65 @@ function Signup() {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = validateForm();
     
     if (Object.keys(newErrors).length === 0) {
-      // Store profile picture in localStorage for demo purposes
-      if (formData.profilePicture && previewImage) {
-        localStorage.setItem('userProfilePicture', previewImage);
+      setLoading(true);
+      try {
+        // Step 1: Create user account
+        const userResponse = await axios.post('http://localhost:3000/users', {
+          username: formData.username,
+          password: formData.password
+        });
+
+        if (userResponse.status === 201) {
+          const userId = userResponse.data._id;
+
+          // Step 2: Create user profile
+          const profileData = {
+            profileImage: previewImage || '',
+            age: formData.age,
+            Description: formData.description
+          };
+
+          await axios.post(`http://localhost:3000/profiles/${userId}`, profileData);
+
+          // Step 3: Store user data locally
+          localStorage.setItem('currentUserId', userId);
+          localStorage.setItem('currentUsername', formData.username); // Changed from currentUserName
+          localStorage.setItem('username', formData.username); // Add this for login compatibility
+          localStorage.setItem('currentUserEmail', formData.email);
+          localStorage.setItem('userName', formData.name);
+          localStorage.setItem('userAge', formData.age);
+          localStorage.setItem('userLocation', formData.location);
+          localStorage.setItem('userDescription', formData.description);
+          localStorage.setItem('userInterests', JSON.stringify(formData.interests));
+          
+          if (previewImage) {
+            localStorage.setItem('userProfilePicture', previewImage);
+          }
+
+          console.log('Signup successful:', {
+            userId,
+            name: formData.name,
+            username: formData.username,
+            email: formData.email
+          });
+          
+          navigate('/menu');
+        }
+      } catch (error) {
+        console.error('Signup error:', error);
+        if (error.response?.status === 400 && error.response?.data?.message?.includes('duplicate')) {
+          setErrors({ username: 'This username is already taken' });
+        } else {
+          setErrors({ general: 'Signup failed. Please try again.' });
+        }
+      } finally {
+        setLoading(false);
       }
-      
-      // Store user data for demo purposes
-      localStorage.setItem('userName', formData.name);
-      localStorage.setItem('userEmail', formData.email);
-      localStorage.setItem('userAge', formData.age);
-      localStorage.setItem('userLocation', formData.location);
-      localStorage.setItem('userDescription', formData.description);
-      localStorage.setItem('userInterests', JSON.stringify(formData.interests));
-      
-      console.log('Signup successful:', {
-        name: formData.name,
-        email: formData.email,
-        age: formData.age,
-        location: formData.location,
-        interests: formData.interests,
-        hasProfilePicture: !!formData.profilePicture
-      });
-      
-      navigate('/menu');
     } else {
       setErrors(newErrors);
     }
@@ -176,6 +218,8 @@ function Signup() {
       <div className="signup-form">
         <h1 className="signup-title">Join the Hive</h1>
         <form onSubmit={handleSubmit}>
+          {errors.general && <div className="error-message">{errors.general}</div>}
+          
           {/* Profile Picture Upload */}
           <div className="form-group">
             <label htmlFor="profilePicture">Profile Picture (Optional)</label>
@@ -217,6 +261,21 @@ function Signup() {
               className={errors.name ? 'error' : ''}
             />
             {errors.name && <span className="error-message">{errors.name}</span>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              placeholder="Choose a unique username"
+              value={formData.username}
+              onChange={handleChange}
+              className={errors.username ? 'error' : ''}
+            />
+            {errors.username && <span className="error-message">{errors.username}</span>}
+            <small className="helper-text">Only letters, numbers, and underscores allowed (minimum 3 characters)</small>
           </div>
 
           <div className="form-group">
@@ -324,8 +383,8 @@ function Signup() {
             <small className="helper-text">Selected: {formData.interests.length}</small>
           </div>
 
-          <button type="submit" className="signup-button">
-            Create Account
+          <button type="submit" className="signup-button" disabled={loading}>
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 

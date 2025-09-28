@@ -1,9 +1,11 @@
 {
   "dependencies": {
+    "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "mongodb": "^6.20.0",
     "mongoose": "^8.18.2",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "openai": "^5.23.1"
   },
   "devDependencies": {
     "express": "^5.1.0",

@@ -77,7 +77,7 @@ const Feed = () => {
             </div>
             
             <div className="profile-tags">
-              {currentProfile.tags.map((tag, index) => (
+              {(currentProfile.tags || []).map((tag, index) => (
                 <span key={index} className="tag">{tag}</span>
               ))}
             </div>

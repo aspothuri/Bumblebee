@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import Feed from '../Feed/Feed';
 import Search from '../Search/Search';
 import Profile from '../Profile/Profile';
@@ -21,6 +22,7 @@ const Menu = () => {
   const [userProfilePicture, setUserProfilePicture] = useState(
     localStorage.getItem('userProfilePicture') || null
   );
+  const [currentUserId] = useState(localStorage.getItem('currentUserId'));
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
@@ -38,10 +40,64 @@ const Menu = () => {
     };
   }, []);
 
-  const handleSaveMatch = (user) => {
+  // Fetch user data on component mount
+  useEffect(() => {
+    if (currentUserId) {
+      fetchUserProfile();
+      fetchSavedMatches();
+    }
+  }, [currentUserId]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/profiles', {
+        params: { searchUserId: currentUserId }
+      });
+
+      if (response.data && response.data.length > 0) {
+        const profileData = response.data[0];
+        // Update local storage with fetched data
+        if (profileData[1]) { // profileImage
+          setUserProfilePicture(profileData[1]);
+          localStorage.setItem('userProfilePicture', profileData[1]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  const fetchSavedMatches = async () => {
+    try {
+      // This would need to be implemented with a matches/favorites system in the backend
+      // For now, we'll keep using local storage as a fallback
+      const savedMatchesFromStorage = localStorage.getItem('savedMatches');
+      if (savedMatchesFromStorage) {
+        setSavedMatches(JSON.parse(savedMatchesFromStorage));
+      }
+    } catch (error) {
+      console.error('Error fetching saved matches:', error);
+    }
+  };
+
+  const handleSaveMatch = async (user) => {
     if (!savedMatches.find(match => match.id === user.id)) {
-      setSavedMatches(prev => [...prev, user]);
+      const updatedMatches = [...savedMatches, user];
+      setSavedMatches(updatedMatches);
       setHoney(prev => prev + 3); // Earn 3 honey for matching
+      
+      // Save to local storage (in a real app, this would be saved to backend)
+      localStorage.setItem('savedMatches', JSON.stringify(updatedMatches));
+      
+      // Create a chat between users
+      try {
+        await axios.post('http://localhost:3000/chat', {
+          user1Id: currentUserId,
+          user2Id: user.id
+        });
+      } catch (error) {
+        console.error('Error creating chat for match:', error);
+      }
     }
   };
 
@@ -105,6 +161,17 @@ const Menu = () => {
   };
 
   const handleLogout = () => {
+    // Clear user data from localStorage
+    localStorage.removeItem('currentUserId');
+    localStorage.removeItem('currentUserEmail');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userAge');
+    localStorage.removeItem('userLocation');
+    localStorage.removeItem('userDescription');
+    localStorage.removeItem('userInterests');
+    localStorage.removeItem('userProfilePicture');
+    localStorage.removeItem('savedMatches');
+    
     navigate('/');
   };
 
