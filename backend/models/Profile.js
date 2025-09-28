@@ -9,33 +9,38 @@ const profile = new mongoose.Schema({
   },
   profileImage: {
     type: String,
-    default: 'https://placehold.co/400x400',
+    default: '',
+    trim: true,
   },
   age: {
     type: Number,
     min: 18,
-    max: 50,
+    max: 100,
     default: 18
   },
   description: {
     type: String,
     trim: true,
-    maxlength: [500, 'Description cannot be more than 500 characters.'],
+    maxlength: [1000, 'Description cannot be more than 1000 characters.'],
+    default: '',
   },
   name: {
     type: String,
     trim: true,
     required: false,
+    default: '',
   },
   email: {
     type: String,
     trim: true,
     required: false,
+    default: '',
   },
   location: {
     type: String,
     trim: true,
     required: false,
+    default: '',
   },
   occupation: {
     type: String,
@@ -59,6 +64,9 @@ const profile = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Add index for faster queries
+profile.index({ user: 1 });
 
 const Profile = mongoose.model('Profile', profile);
 

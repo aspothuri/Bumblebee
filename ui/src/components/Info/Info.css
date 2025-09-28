@@ -1,52 +1,128 @@
 .bb-info-container {
   min-height: 100vh;
-  width: 100vw;
-  background: linear-gradient(135deg, #ffeb3b 0%, #000 100%);
+  width: 100%;
+  background: linear-gradient(135deg, #ffeb3b 0%, #1a1a1a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-top: 90px;
-  box-sizing: border-box;
+  padding: 120px 24px 60px;
+  position: relative;
+  overflow: hidden;
+}
+
+.bb-info-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 70%, rgba(255, 235, 59, 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 70% 30%, rgba(26, 26, 26, 0.2) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .bb-info-content {
-  background: #fffde7;
-  border: 4px solid #000;
-  border-radius: 18px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  padding: 48px 36px;
-  max-width: 600px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  border-radius: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  padding: 64px 48px;
+  max-width: 800px;
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
 .bb-info-title {
-  color: #000;
-  font-size: 2.2rem;
-  font-weight: bold;
-  margin-bottom: 18px;
-  letter-spacing: 1.2px;
+  color: #1a1a1a;
+  font-size: 3rem;
+  font-weight: 900;
+  margin-bottom: 32px;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #1a1a1a 0%, #ffb300 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .bb-info-desc {
-  color: #333;
-  font-size: 1.1rem;
-  margin-bottom: 28px;
-  line-height: 1.6;
+  color: #4a4a4a;
+  font-size: 1.25rem;
+  margin-bottom: 48px;
+  line-height: 1.7;
+  font-weight: 400;
 }
 
 .bb-info-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: grid;
+  gap: 20px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .bb-info-list li {
-  color: #000;
-  font-size: 1.05rem;
-  font-weight: 500;
-  margin-bottom: 12px;
-  background: #ffeb3b;
-  border-radius: 8px;
-  padding: 8px 0;
-  box-shadow: 0 2px 8px rgba(255,235,59,0.10);
+  color: #1a1a1a;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 8px 32px rgba(255, 235, 59, 0.3);
+  border: 1px solid rgba(255, 235, 59, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.bb-info-list li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.bb-info-list li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 48px rgba(255, 235, 59, 0.4);
+  background: linear-gradient(135deg, #fff59d 0%, #ffb300 100%);
+}
+
+.bb-info-list li:hover::before {
+  left: 100%;
+}
+
+@media (max-width: 768px) {
+  .bb-info-container {
+    padding: 100px 16px 40px;
+  }
+  
+  .bb-info-content {
+    padding: 40px 24px;
+    border-radius: 24px;
+  }
+  
+  .bb-info-title {
+    font-size: 2.25rem;
+  }
+  
+  .bb-info-desc {
+    font-size: 1.1rem;
+  }
+  
+  .bb-info-list li {
+    font-size: 1rem;
+    padding: 16px 20px;
+  }
 }

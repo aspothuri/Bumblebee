@@ -61,36 +61,56 @@ router.post('/:userId', async (req, res) => {
         location
     } = req.body;
     
-    const newProfile = new Profile({
-        user: userId, 
-        profileImage,
+    console.log('Creating profile for user:', userId);
+    console.log('Profile data received:', {
+        hasProfileImage: !!profileImage,
+        profileImageLength: profileImage ? profileImage.length : 0,
         age,
-        description: Description,
         name,
         email,
-        location
+        location,
+        descriptionLength: Description ? Description.length : 0
+    });
+    
+    const newProfile = new Profile({
+        user: userId, 
+        profileImage: profileImage || '', // Ensure empty string if no image
+        age: age || 18,
+        description: Description || '',
+        name: name || '',
+        email: email || '',
+        location: location || ''
     });
 
     try {
         // Step 1: save the profile
         const savedProfile = await newProfile.save();
+        console.log('Profile saved successfully:', savedProfile._id);
 
         // Step 2: generate tags from description
         let tags = {};
-        if (Description) {
+        if (Description && Description.trim()) {
+            console.log('Generating tags from description...');
             tags = await generateTags(Description);
+            console.log('Generated tags:', tags);
         }
 
         // Step 3: save tags to DB if valid
         let savedTagSet = null;
-        if (tags) {
+        if (tags && Object.keys(tags).length > 0) {
+            console.log('Saving tags to database...');
             savedTagSet = await new Tag({ user: userId, ...tags }).save();
+            console.log('Tags saved successfully:', savedTagSet._id);
         }
 
         // Step 4: respond with both profile + tags
-        res.status(201).json({ profile: savedProfile, tags: savedTagSet });
+        res.status(201).json({ 
+            profile: savedProfile, 
+            tags: savedTagSet,
+            message: 'Profile created successfully'
+        });
     } catch (err) {
-        console.error(err);
+        console.error('Error creating profile:', err);
         res.status(400).json({ message: err.message });
     }
 });
@@ -100,14 +120,72 @@ router.put('/:userId', async (req, res) => {
     const userId = req.params.userId;
     const updateData = req.body;
     
+    console.log('Updating profile for user:', userId);
+    console.log('Update data received:', {
+        hasProfileImage: !!updateData.profileImage,
+        profileImageLength: updateData.profileImage ? updateData.profileImage.length : 0,
+        age: updateData.age,
+        name: updateData.name,
+        email: updateData.email,
+        location: updateData.location,
+        descriptionLength: updateData.Description ? updateData.Description.length : 0
+    });
+    
     try {
+        // Prepare the update object
+        const updateObject = {};
+        
+        if (updateData.profileImage !== undefined) {
+            updateObject.profileImage = updateData.profileImage;
+        }
+        if (updateData.age !== undefined) {
+            updateObject.age = updateData.age;
+        }
+        if (updateData.Description !== undefined) {
+            updateObject.description = updateData.Description;
+        }
+        if (updateData.name !== undefined) {
+            updateObject.name = updateData.name;
+        }
+        if (updateData.email !== undefined) {
+            updateObject.email = updateData.email;
+        }
+        if (updateData.location !== undefined) {
+            updateObject.location = updateData.location;
+        }
+        
         const updatedProfile = await Profile.findOneAndUpdate(
             { user: userId },
-            updateData,
+            updateObject,
             { new: true, upsert: true }
         );
         
-        res.status(200).json(updatedProfile);
+        console.log('Profile updated successfully:', updatedProfile._id);
+        
+        // If description was updated, regenerate tags
+        if (updateData.Description !== undefined) {
+            try {
+                console.log('Regenerating tags for updated description...');
+                const tags = await generateTags(updateData.Description);
+                
+                if (tags && Object.keys(tags).length > 0) {
+                    await Tag.findOneAndUpdate(
+                        { user: userId },
+                        tags,
+                        { new: true, upsert: true }
+                    );
+                    console.log('Tags updated successfully');
+                }
+            } catch (tagError) {
+                console.error('Error updating tags:', tagError);
+                // Don't fail the profile update if tag update fails
+            }
+        }
+        
+        res.status(200).json({
+            profile: updatedProfile,
+            message: 'Profile updated successfully'
+        });
     } catch (error) {
         console.error('Error updating profile:', error);
         res.status(500).json({ message: 'Internal Server Error' });

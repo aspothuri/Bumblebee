@@ -142,19 +142,39 @@ const Menu = () => {
 
   const fetchUserProfile = async () => {
     try {
+      console.log('Menu: Fetching profile for user:', currentUserId);
       const response = await axios.get('http://localhost:3000/profiles', {
         params: { searchUserId: currentUserId }
       });
 
+      console.log('Menu: Profile response:', response.data);
+
       if (response.data && response.data.length > 0) {
         const profileData = response.data[0];
-        // Update profile picture from backend
-        if (profileData[1]) { // profileImage
+        console.log('Menu: Profile data:', profileData);
+        
+        // Update profile picture from backend (profileData[1] is profileImage)
+        if (profileData[1] && profileData[1].trim()) {
+          console.log('Menu: Setting profile picture from backend');
           setUserProfilePicture(profileData[1]);
+        } else {
+          console.log('Menu: No profile picture found in backend');
+          setUserProfilePicture(null);
         }
+        
+        // Update session storage with latest profile data
+        if (profileData[4]) sessionStorage.setItem('userName', profileData[4]);
+        if (profileData[5]) sessionStorage.setItem('currentUserEmail', profileData[5]);
+        if (profileData[6]) sessionStorage.setItem('userLocation', profileData[6]);
+        if (profileData[2]) sessionStorage.setItem('userAge', profileData[2].toString());
+        if (profileData[3]) sessionStorage.setItem('userDescription', profileData[3]);
+      } else {
+        console.log('Menu: No profile data found');
+        setUserProfilePicture(null);
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Menu: Error fetching user profile:', error);
+      setUserProfilePicture(null);
     }
   };
 
@@ -327,8 +347,21 @@ const Menu = () => {
     setShowProfileDropdown(!showProfileDropdown);
   };
 
-  const handleProfilePictureUpdate = (newPicture) => {
+  const handleProfilePictureUpdate = async (newPicture) => {
+    console.log('Menu: Updating profile picture:', !!newPicture);
     setUserProfilePicture(newPicture);
+    
+    // Also update in backend immediately
+    if (currentUserId) {
+      try {
+        await axios.put(`http://localhost:3000/profiles/${currentUserId}`, {
+          profileImage: newPicture || ''
+        });
+        console.log('Menu: Profile picture updated in backend');
+      } catch (error) {
+        console.error('Menu: Error updating profile picture in backend:', error);
+      }
+    }
   };
 
   const handleNavigateToProfile = () => {
