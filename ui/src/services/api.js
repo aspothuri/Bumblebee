@@ -43,7 +43,7 @@ export const getUserColonyFromTags = async (userId) => {
     const userTagData = response.data.find(tagArray => tagArray[0] === userId);
     if (!userTagData) {
       console.log('API: No tags found for user, returning default colony');
-      return 'adventure'; // Default colony
+      return 'politics'; // Default to Debate District
     }
     
     // Convert array to object with tag names
@@ -61,11 +61,11 @@ export const getUserColonyFromTags = async (userId) => {
     });
     
     // Find highest scoring tag as primary colony
-    let highestTag = 'adventure';
+    let highestTag = 'politics'; // Default to Debate District
     let highestScore = 0;
     
     for (const [tag, score] of Object.entries(userTags)) {
-      if (score > highestScore) {
+      if (score > highestScore && tagColonies[tag]) { // Ensure tag exists in colonies
         highestScore = score;
         highestTag = tag;
       }
@@ -76,7 +76,7 @@ export const getUserColonyFromTags = async (userId) => {
     
   } catch (error) {
     console.error('API: Error fetching user tags for colony assignment:', error);
-    return 'adventure'; // Default fallback
+    return 'politics'; // Default fallback to Debate District
   }
 };
 
@@ -143,7 +143,7 @@ const getConnections = (tag, rankings, index) => {
   return connections;
 };
 
-// Fetch user's tags and generate their personalized colonies
+// Fetch user's personalized colonies
 export const getUserColonies = async (userId) => {
   try {
     console.log('API: Fetching user tags for:', userId);
@@ -192,7 +192,7 @@ export const getUserColonies = async (userId) => {
     return {
       colonies,
       mapLayout,
-      startingColony: rankedTags[0], // Start at highest ranked tag
+      startingColony: rankedTags[0] || 'politics', // Fallback to Debate District
       userTags,
       rankedTags
     };

@@ -18,7 +18,7 @@ const Menu = () => {
   const [selectedMatchForMessage, setSelectedMatchForMessage] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [honey, setHoney] = useState(10);
-  const [currentColony, setCurrentColony] = useState('adventure'); // Use tag-based default
+  const [currentColony, setCurrentColony] = useState('politics'); // Use Debate District as default
   const [userProfilePicture, setUserProfilePicture] = useState(null);
   const [userColonies, setUserColonies] = useState({});
   const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
@@ -26,11 +26,18 @@ const Menu = () => {
   const dropdownRef = useRef(null);
 
   const getColonyInfo = (colonyId) => {
+    if (!colonyId || colonyId === 'undefined' || colonyId === 'null') {
+      return { 
+        name: 'Debate District', 
+        color: '#636e72',
+        icon: '🏛️'
+      };
+    }
     // First check user's personalized colonies, then fall back to tag colonies
     return userColonies[colonyId] || tagColonies[colonyId] || { 
-      name: 'Adventure Peak', // Use tag-based default instead of honeycomb
-      color: '#ff6b35',
-      icon: '🏔️'
+      name: 'Debate District',
+      color: '#636e72',
+      icon: '🏛️'
     };
   };
 
@@ -61,19 +68,19 @@ const Menu = () => {
         const colonyData = await getUserColonies(currentUserId);
         if (colonyData) {
           setUserColonies(colonyData.colonies);
-          setCurrentColony(colonyData.startingColony || 'adventure');
+          setCurrentColony(colonyData.startingColony || 'politics'); // Default to Debate District
           console.log('Menu: User colonies loaded, starting colony:', colonyData.startingColony);
         } else {
           // Fallback to tag-based system
           setUserColonies(tagColonies);
-          setCurrentColony('adventure');
+          setCurrentColony('politics'); // Default to Debate District
           console.log('Menu: Using fallback tag colonies');
         }
       } catch (error) {
         console.error('Menu: Error loading user colonies:', error);
         // Fallback to tag-based system
         setUserColonies(tagColonies);
-        setCurrentColony('adventure');
+        setCurrentColony('politics'); // Default to Debate District
       }
     };
     
@@ -116,7 +123,7 @@ const Menu = () => {
         if (userCurrentColony && tagColonies[userCurrentColony]) {
           setCurrentColony(userCurrentColony);
         } else {
-          setCurrentColony('adventure'); // Default to adventure instead of honeycomb
+          setCurrentColony('politics'); // Default to Debate District instead of adventure
         }
       }
     } catch (error) {
@@ -127,7 +134,7 @@ const Menu = () => {
       if (sessionColony && tagColonies[sessionColony]) {
         setCurrentColony(sessionColony);
       } else {
-        setCurrentColony('adventure'); // Default to adventure instead of honeycomb
+        setCurrentColony('politics'); // Default to Debate District instead of adventure
       }
     }
   };
@@ -196,7 +203,12 @@ const Menu = () => {
               
               // Get colony assignment based on database tags
               const { getUserColonyFromTags } = await import('../../services/api');
-              const userColony = await getUserColonyFromTags(otherUserId);
+              let userColony = await getUserColonyFromTags(otherUserId);
+              
+              // Ensure valid colony assignment
+              if (!userColony || !tagColonies[userColony]) {
+                userColony = 'politics'; // Default to Debate District
+              }
               
               return {
                 id: otherUserId,

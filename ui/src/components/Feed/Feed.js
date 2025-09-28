@@ -15,9 +15,17 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
   const currentProfile = profiles[currentProfileIndex];
 
   const getColonyInfo = (colonyId) => {
+    if (!colonyId || colonyId === 'undefined' || colonyId === 'null') {
+      return { 
+        name: 'Debate District', 
+        color: '#636e72',
+        icon: '🏛️'
+      };
+    }
     return userColonies[colonyId] || tagColonies[colonyId] || { 
-      name: 'Unknown Colony', 
-      color: '#ffc107' 
+      name: 'Debate District', 
+      color: '#636e72',
+      icon: '🏛️'
     };
   };
 
@@ -78,7 +86,7 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
           if (compatibilityResponse.data && compatibilityResponse.data.length > 0) {
             console.log('Feed: Found compatible users:', compatibilityResponse.data.length);
 
-            const profilePromises = compatibilityResponse.data.slice(0, 50).map(async (compatibleUser) => {
+            const profilePromises = compatibilityResponse.data.map(async (compatibleUser) => {
               try {
                 console.log('Feed: Fetching profile for compatible user:', compatibleUser.userId);
                 const profileResponse = await axios.get('http://localhost:3000/profiles', {
@@ -88,11 +96,13 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
                 if (profileResponse.data && profileResponse.data.length > 0) {
                   const profileData = profileResponse.data[0];
                   
-                  // Get colony assignment based on database tags
                   const { getUserColonyFromTags } = await import('../../services/api');
-                  const userColony = await getUserColonyFromTags(compatibleUser.userId);
+                  let userColony = await getUserColonyFromTags(compatibleUser.userId);
                   
-                  // Only include users from the current colony
+                  if (!userColony || !tagColonies[userColony]) {
+                    userColony = 'politics'; // Default to Debate District
+                  }
+                  
                   if (userColony === currentColony) {
                     return {
                       id: compatibleUser.userId,
@@ -118,7 +128,6 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
 
             const compatibleProfiles = await Promise.all(profilePromises);
             fetchedProfiles = compatibleProfiles.filter(profile => profile !== null);
-            fetchedProfiles.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
             console.log('Feed: Compatible profiles in current colony:', fetchedProfiles.length);
           }
         } catch (compatibilityError) {
@@ -134,14 +143,16 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
             if (allProfilesResponse.data && allProfilesResponse.data.length > 0) {
               const profilePromises = allProfilesResponse.data
                 .filter(profile => profile[0] !== currentUserId) // exclude current user
-                .slice(0, 50)
                 .map(async (profileData) => {
                   try {
-                    // Get colony assignment based on database tags
                     const { getUserColonyFromTags } = await import('../../services/api');
-                    const userColony = await getUserColonyFromTags(profileData[0]);
+                    let userColony = await getUserColonyFromTags(profileData[0]);
                     
-                    // Only include users from the current colony
+                    // Ensure valid colony assignment
+                    if (!userColony || !tagColonies[userColony]) {
+                      userColony = 'politics'; 
+                    }
+                    
                     if (userColony === currentColony) {
                       return {
                         id: profileData[0],
@@ -166,7 +177,6 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
 
               const allProfiles = await Promise.all(profilePromises);
               fetchedProfiles = allProfiles.filter(profile => profile !== null);
-              fetchedProfiles.sort((a, b) => (b.compatibility || 0) - (a.compatibility || 0));
               console.log('Feed: Fallback profiles in current colony:', fetchedProfiles.length);
             }
           } catch (allProfilesError) {
@@ -176,7 +186,7 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
 
         console.log('Feed: Final fetched profiles for colony', currentColony + ':', fetchedProfiles.length);
         setProfiles(fetchedProfiles);
-        setCurrentProfileIndex(0); // Reset to first profile when colony changes
+        setCurrentProfileIndex(0); 
       } catch (error) {
         console.error('Error fetching compatible users:', error);
         setProfiles([]);
@@ -191,24 +201,18 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
     }
   }, [currentUserId, currentColony, userColonies]);
 
-  const handleBuzzOff = async () => {
+  const handleBuzzOff = () => {
     if (!currentProfile || transitioning) return;
     
     console.log(`Buzzing off ${currentProfile.name}`);
     setTransitioning(true);
     
-    // Add a small delay for visual feedback
+    // Move to next profile immediately
+    const nextIndex = (currentProfileIndex + 1) % profiles.length;
+    console.log(`Feed: Moving from index ${currentProfileIndex} to ${nextIndex} (total: ${profiles.length})`);
+    
     setTimeout(() => {
-      if (currentProfileIndex >= profiles.length - 1) {
-        // If we're at the last profile, cycle back to beginning
-        console.log('Feed: Reached end of profiles, cycling back to start');
-        setCurrentProfileIndex(0);
-      } else {
-        // Move to next profile
-        const nextIndex = currentProfileIndex + 1;
-        console.log(`Feed: Moving to profile index ${nextIndex}`);
-        setCurrentProfileIndex(nextIndex);
-      }
+      setCurrentProfileIndex(nextIndex);
       setTransitioning(false);
     }, 300);
   };
@@ -219,19 +223,20 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
     console.log(`Matched with ${currentProfile.name}!`);
     setTransitioning(true);
     
-    // Save the match first and wait for it to complete
+    // Calculate next index before async operations
+    const nextIndex = (currentProfileIndex + 1) % profiles.length;
+    console.log(`Feed: Moving from index ${currentProfileIndex} to ${nextIndex} after match (total: ${profiles.length})`);
+    
     if (onSaveMatch) {
       try {
         await onSaveMatch(currentProfile);
         console.log('Feed: Match saved successfully, honey should be increased by 3');
         
-        // Navigate to conversation with this person after successful save
         if (onNavigateToMessage) {
           onNavigateToMessage(currentProfile);
         }
       } catch (error) {
         console.error('Feed: Error saving match:', error);
-        // Still navigate even if save fails
         if (onNavigateToMessage) {
           onNavigateToMessage(currentProfile);
         }
@@ -240,11 +245,7 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
     
     // Move to next profile after a delay
     setTimeout(() => {
-      if (currentProfileIndex >= profiles.length - 1) {
-        setCurrentProfileIndex(0);
-      } else {
-        setCurrentProfileIndex(currentProfileIndex + 1);
-      }
+      setCurrentProfileIndex(nextIndex);
       setTransitioning(false);
     }, 300);
   };
@@ -326,7 +327,7 @@ const Feed = ({ onSaveMatch, currentColony, onNavigateToMessage }) => {
             )}
             <div className="profile-colony">
               <span className="colony-badge" style={{ backgroundColor: getColonyInfo(currentProfile.colony).color }}>
-                🏛️ {getColonyInfo(currentProfile.colony).name}
+                {getColonyInfo(currentProfile.colony).icon} {getColonyInfo(currentProfile.colony).name}
               </span>
             </div>
           </div>

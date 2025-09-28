@@ -41,6 +41,22 @@ const Search = ({ onSaveMatch, currentColony }) => {
     loadUserColonies();
   }, [currentUserId]);
 
+  // Helper function to get colony info with proper fallback
+  const getColonyInfo = (colonyId) => {
+    if (!colonyId || colonyId === 'undefined' || colonyId === 'null') {
+      return { 
+        name: 'Debate District', 
+        color: '#636e72',
+        icon: '🏛️'
+      };
+    }
+    return userColonies[colonyId] || { 
+      name: 'Debate District', 
+      color: '#636e72',
+      icon: '🏛️'
+    };
+  };
+
   // Fetch users from API
   useEffect(() => {
     const fetchUsers = async () => {
@@ -83,7 +99,12 @@ const Search = ({ onSaveMatch, currentColony }) => {
                   
                   // Get colony assignment based on database tags
                   const { getUserColonyFromTags } = await import('../../services/api');
-                  const userColony = await getUserColonyFromTags(compatibleUser.userId);
+                  let userColony = await getUserColonyFromTags(compatibleUser.userId);
+                  
+                  // Ensure valid colony assignment
+                  if (!userColony || !userColonies[userColony]) {
+                    userColony = 'politics'; // Default to Debate District
+                  }
                   
                   return {
                     id: compatibleUser.userId,
@@ -146,7 +167,12 @@ const Search = ({ onSaveMatch, currentColony }) => {
                   try {
                     // Get colony assignment based on database tags
                     const { getUserColonyFromTags } = await import('../../services/api');
-                    const userColony = await getUserColonyFromTags(profileData[0]);
+                    let userColony = await getUserColonyFromTags(profileData[0]);
+                    
+                    // Ensure valid colony assignment
+                    if (!userColony || !userColonies[userColony]) {
+                      userColony = 'politics'; // Default to Debate District
+                    }
                     
                     const formattedProfile = {
                       id: profileData[0],
@@ -347,8 +373,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
                   </div>
                 )}
                 <div className="profile-colony">
-                  <span className="colony-badge" style={{ backgroundColor: userColonies[viewingProfile.colony]?.color }}>
-                    🏛️ {userColonies[viewingProfile.colony]?.name}
+                  <span className="colony-badge" style={{ backgroundColor: getColonyInfo(viewingProfile.colony).color }}>
+                    {getColonyInfo(viewingProfile.colony).icon} {getColonyInfo(viewingProfile.colony).name}
                   </span>
                 </div>
               </div>
@@ -398,8 +424,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
       <div className="search-header">
         <h2 className="search-title">🔍 Find Your Match</h2>
         <div className="colony-indicator">
-          <span className="colony-badge" style={{ backgroundColor: userColonies[currentColony]?.color }}>
-            Exploring: {userColonies[currentColony]?.icon} {userColonies[currentColony]?.name}
+          <span className="colony-badge" style={{ backgroundColor: getColonyInfo(currentColony).color }}>
+            Exploring: {getColonyInfo(currentColony).icon} {getColonyInfo(currentColony).name}
           </span>
         </div>
       </div>
@@ -431,8 +457,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
                   )}
                 </div>
                 <p>{user.location}</p>
-                <div className="colony-badge" style={{ backgroundColor: userColonies[user.colony]?.color }}>
-                  🏛️ {userColonies[user.colony]?.name}
+                <div className="colony-badge" style={{ backgroundColor: getColonyInfo(user.colony).color }}>
+                  {getColonyInfo(user.colony).icon} {getColonyInfo(user.colony).name}
                 </div>
                 <p className="result-bio">{user.bio.substring(0, 80)}...</p>
               </div>

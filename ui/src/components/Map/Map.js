@@ -35,7 +35,7 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
 
           // Initialize unlocked colonies - start with top colony and 3 nearest
           const initialUnlocked = {};
-          const startingColony = colonyData.startingColony;
+          const startingColony = colonyData.startingColony || 'politics'; // Default to Debate District
           initialUnlocked[startingColony] = true;
 
           // Unlock 3 closest colonies based on ranking
@@ -159,11 +159,9 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
   };
 
   const isColonyAccessible = (colonyId) => {
-    // Colony is accessible if it's unlocked or available to unlock
     return unlockedColonies.hasOwnProperty(colonyId);
   };
 
-  // 🔹 Animate bee step by step along path
   useEffect(() => {
     if (!travelingBee) return;
 
@@ -176,7 +174,7 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
 
     const timer = setTimeout(() => {
       setTravelingBee({ path, index: index + 1 });
-    }, 800); // Slightly faster animation
+    }, 800); 
 
     return () => clearTimeout(timer);
   }, [travelingBee, onColonyChange]);
@@ -189,11 +187,9 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     const nextPos = mapLayout[path[index + 1]];
 
     if (!nextPos) {
-      // At final destination
       return { x: currentPos.x, y: currentPos.y - 3 };
     }
 
-    // Moving between positions
     return {
       x: (currentPos.x + nextPos.x) / 2,
       y: (currentPos.y + nextPos.y) / 2 - 3,
@@ -215,7 +211,6 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     setTooltipTimeout(timeout);
   };
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (tooltipTimeout) {
