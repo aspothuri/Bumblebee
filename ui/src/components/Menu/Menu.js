@@ -7,6 +7,7 @@ import Profile from '../Profile/Profile';
 import Hive from '../Hive/Hive';
 import Messages from '../Messages/Messages';
 import Map from '../Map/Map';
+import { tagColonies, getUserColonies } from '../../services/api.js';
 import './Menu.css';
 
 const Menu = () => {
@@ -17,11 +18,21 @@ const Menu = () => {
   const [selectedMatchForMessage, setSelectedMatchForMessage] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [honey, setHoney] = useState(10);
-  const [currentColony, setCurrentColony] = useState('honeycomb');
+  const [currentColony, setCurrentColony] = useState('adventure'); // Use tag-based default
   const [userProfilePicture, setUserProfilePicture] = useState(null);
+  const [userColonies, setUserColonies] = useState({});
   const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
+
+  const getColonyInfo = (colonyId) => {
+    // First check user's personalized colonies, then fall back to tag colonies
+    return userColonies[colonyId] || tagColonies[colonyId] || { 
+      name: 'Adventure Peak', // Use tag-based default instead of honeycomb
+      color: '#ff6b35',
+      icon: '🏔️'
+    };
+  };
 
   // Add debugging and redirect if no user
   useEffect(() => {
@@ -40,15 +51,34 @@ const Menu = () => {
     console.log('Menu: User is logged in with ID:', currentUserId);
   }, [currentUserId, navigate]);
 
-  // Colony definitions inline
-  const colonies = {
-    honeycomb: { name: "Honeycomb Heights", color: "#ffc107", unlocked: true, cost: 0 },
-    meadow: { name: "Meadow Fields", color: "#4caf50", unlocked: false, cost: 15 },
-    sunset: { name: "Sunset Valley", color: "#ff9800", unlocked: false, cost: 20 },
-    crystal: { name: "Crystal Gardens", color: "#2196f3", unlocked: false, cost: 25 },
-    forest: { name: "Whispering Woods", color: "#795548", unlocked: false, cost: 30 },
-    ocean: { name: "Ocean Breeze", color: "#00bcd4", unlocked: false, cost: 35 }
-  };
+  // Load user's personalized colony system
+  useEffect(() => {
+    const loadUserColonies = async () => {
+      if (!currentUserId) return;
+      
+      try {
+        console.log('Menu: Loading user colonies...');
+        const colonyData = await getUserColonies(currentUserId);
+        if (colonyData) {
+          setUserColonies(colonyData.colonies);
+          setCurrentColony(colonyData.startingColony || 'adventure');
+          console.log('Menu: User colonies loaded, starting colony:', colonyData.startingColony);
+        } else {
+          // Fallback to tag-based system
+          setUserColonies(tagColonies);
+          setCurrentColony('adventure');
+          console.log('Menu: Using fallback tag colonies');
+        }
+      } catch (error) {
+        console.error('Menu: Error loading user colonies:', error);
+        // Fallback to tag-based system
+        setUserColonies(tagColonies);
+        setCurrentColony('adventure');
+      }
+    };
+    
+    loadUserColonies();
+  }, [currentUserId]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -81,13 +111,24 @@ const Menu = () => {
       const response = await axios.get(`http://localhost:3000/users/${currentUserId}`);
       if (response.data) {
         setHoney(response.data.honey || 10);
-        setCurrentColony(response.data.currentColony || 'honeycomb');
+        // Only set colony if it's a valid tag-based colony
+        const userCurrentColony = response.data.currentColony;
+        if (userCurrentColony && tagColonies[userCurrentColony]) {
+          setCurrentColony(userCurrentColony);
+        } else {
+          setCurrentColony('adventure'); // Default to adventure instead of honeycomb
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
       // Use session storage as fallback
       setHoney(parseInt(sessionStorage.getItem('userHoney')) || 10);
-      setCurrentColony(sessionStorage.getItem('userColony') || 'honeycomb');
+      const sessionColony = sessionStorage.getItem('userColony');
+      if (sessionColony && tagColonies[sessionColony]) {
+        setCurrentColony(sessionColony);
+      } else {
+        setCurrentColony('adventure'); // Default to adventure instead of honeycomb
+      }
     }
   };
 
@@ -132,13 +173,18 @@ const Menu = () => {
             
             if (profileResponse.data && profileResponse.data.length > 0) {
               const profileData = profileResponse.data[0];
+              
+              // Get colony assignment based on database tags
+              const { getUserColonyFromTags } = await import('../../services/api');
+              const userColony = await getUserColonyFromTags(otherUserId);
+              
               return {
                 id: otherUserId,
                 name: profileData[4] || `User ${otherUserId}`,
                 age: profileData[2] || 25,
                 bio: profileData[3] || 'Looking for meaningful connections!',
                 location: profileData[6] || 'City, State',
-                colony: currentColony,
+                colony: userColony,
                 photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
                 occupation: 'Professional',
                 education: 'University',
@@ -347,8 +393,8 @@ const Menu = () => {
                     </div>
                   )}
                   <div className="profile-colony">
-                    <span className="colony-badge" style={{ backgroundColor: colonies[viewingProfile.colony].color }}>
-                      🏛️ {colonies[viewingProfile.colony].name}
+                    <span className="colony-badge" style={{ backgroundColor: getColonyInfo(viewingProfile.colony).color }}>
+                      🏛️ {getColonyInfo(viewingProfile.colony).name}
                     </span>
                   </div>
                 </div>
@@ -445,8 +491,8 @@ const Menu = () => {
           <h1 className="app-title">🐝 Bumblebee</h1>
           <div className="header-info">
             <div className="colony-info" onClick={handleColonyClick} style={{ cursor: 'pointer' }}>
-              <span className="colony-badge" style={{ backgroundColor: colonies[currentColony].color }}>
-                🏛️ {colonies[currentColony].name}
+              <span className="colony-badge" style={{ backgroundColor: getColonyInfo(currentColony).color }}>
+                🏛️ {getColonyInfo(currentColony).name}
               </span>
             </div>
             <div className="honey-display">

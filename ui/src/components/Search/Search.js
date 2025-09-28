@@ -19,15 +19,27 @@ const Search = ({ onSaveMatch, currentColony }) => {
     console.log('- currentUserEmail:', sessionStorage.getItem('currentUserEmail'));
   }, []);
 
-  // Colony definitions inline
-  const colonies = {
-    honeycomb: { name: "Honeycomb Heights", color: "#ffc107", unlocked: true, cost: 0 },
-    meadow: { name: "Meadow Fields", color: "#4caf50", unlocked: false, cost: 15 },
-    sunset: { name: "Sunset Valley", color: "#ff9800", unlocked: false, cost: 20 },
-    crystal: { name: "Crystal Gardens", color: "#2196f3", unlocked: false, cost: 25 },
-    forest: { name: "Whispering Woods", color: "#795548", unlocked: false, cost: 30 },
-    ocean: { name: "Ocean Breeze", color: "#00bcd4", unlocked: false, cost: 35 }
-  };
+  // Remove hardcoded colonies - will be fetched dynamically
+  const [userColonies, setUserColonies] = useState({});
+
+  // Fetch user's personalized colonies
+  useEffect(() => {
+    const loadUserColonies = async () => {
+      if (!currentUserId) return;
+      
+      try {
+        const { getUserColonies } = await import('../../services/api');
+        const colonyData = await getUserColonies(currentUserId);
+        if (colonyData) {
+          setUserColonies(colonyData.colonies);
+        }
+      } catch (error) {
+        console.error('Search: Error loading user colonies:', error);
+      }
+    };
+    
+    loadUserColonies();
+  }, [currentUserId]);
 
   // Fetch users from API
   useEffect(() => {
@@ -68,8 +80,10 @@ const Search = ({ onSaveMatch, currentColony }) => {
                 
                 if (profileResponse.data && Array.isArray(profileResponse.data) && profileResponse.data.length > 0) {
                   const profileData = profileResponse.data[0];
-                  const colonyKeys = Object.keys(colonies);
-                  const randomColony = colonyKeys[Math.floor(Math.random() * colonyKeys.length)];
+                  
+                  // Get colony assignment based on database tags
+                  const { getUserColonyFromTags } = await import('../../services/api');
+                  const userColony = await getUserColonyFromTags(compatibleUser.userId);
                   
                   return {
                     id: compatibleUser.userId,
@@ -77,7 +91,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                     age: profileData[2] || 25,
                     bio: profileData[3] || 'Looking for meaningful connections!',
                     location: profileData[6] || 'City, State',
-                    colony: randomColony,
+                    colony: userColony,
                     photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
                     occupation: 'Professional',
                     education: 'University',
@@ -130,8 +144,9 @@ const Search = ({ onSaveMatch, currentColony }) => {
                 .slice(0, 50) // Limit to first 50 profiles
                 .map(async (profileData) => {
                   try {
-                    const colonyKeys = Object.keys(colonies);
-                    const randomColony = colonyKeys[Math.floor(Math.random() * colonyKeys.length)];
+                    // Get colony assignment based on database tags
+                    const { getUserColonyFromTags } = await import('../../services/api');
+                    const userColony = await getUserColonyFromTags(profileData[0]);
                     
                     const formattedProfile = {
                       id: profileData[0],
@@ -139,7 +154,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
                       age: profileData[2] || 25,
                       bio: profileData[3] || 'Looking for meaningful connections!',
                       location: profileData[6] || 'City, State',
-                      colony: randomColony,
+                      colony: userColony,
                       photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
                       occupation: 'Professional',
                       education: 'University',
@@ -185,7 +200,7 @@ const Search = ({ onSaveMatch, currentColony }) => {
     };
 
     fetchUsers();
-  }, [currentUserId]);
+  }, [currentUserId, userColonies]);
 
   const handleSearch = () => {
     let filtered = allUsers.filter(user => {
@@ -210,6 +225,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
 
   const handleBuzzOff = (user) => {
     console.log(`Buzzed off ${user.name}`);
+    // Close the profile view and return to search results
+    setViewingProfile(null);
   };
 
   useEffect(() => {
@@ -233,8 +250,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
         <div className="search-header">
           <h2 className="search-title">🔍 Find Your Match</h2>
           <div className="colony-indicator">
-            <span className="colony-badge" style={{ backgroundColor: colonies[currentColony].color }}>
-              Exploring: {colonies[currentColony].name}
+            <span className="colony-badge" style={{ backgroundColor: userColonies[currentColony]?.color }}>
+              Exploring: {userColonies[currentColony]?.icon} {userColonies[currentColony]?.name}
             </span>
           </div>
         </div>
@@ -330,8 +347,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
                   </div>
                 )}
                 <div className="profile-colony">
-                  <span className="colony-badge" style={{ backgroundColor: colonies[viewingProfile.colony].color }}>
-                    🏛️ {colonies[viewingProfile.colony].name}
+                  <span className="colony-badge" style={{ backgroundColor: userColonies[viewingProfile.colony]?.color }}>
+                    🏛️ {userColonies[viewingProfile.colony]?.name}
                   </span>
                 </div>
               </div>
@@ -381,8 +398,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
       <div className="search-header">
         <h2 className="search-title">🔍 Find Your Match</h2>
         <div className="colony-indicator">
-          <span className="colony-badge" style={{ backgroundColor: colonies[currentColony].color }}>
-            Exploring: {colonies[currentColony].name}
+          <span className="colony-badge" style={{ backgroundColor: userColonies[currentColony]?.color }}>
+            Exploring: {userColonies[currentColony]?.icon} {userColonies[currentColony]?.name}
           </span>
         </div>
       </div>
@@ -414,8 +431,8 @@ const Search = ({ onSaveMatch, currentColony }) => {
                   )}
                 </div>
                 <p>{user.location}</p>
-                <div className="colony-badge" style={{ backgroundColor: colonies[user.colony].color }}>
-                  🏛️ {colonies[user.colony].name}
+                <div className="colony-badge" style={{ backgroundColor: userColonies[user.colony]?.color }}>
+                  🏛️ {userColonies[user.colony]?.name}
                 </div>
                 <p className="result-bio">{user.bio.substring(0, 80)}...</p>
               </div>

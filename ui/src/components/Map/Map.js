@@ -1,20 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { colonies, mapLayout, colonyAPI } from '../../services/api';
+import { getUserColonies } from '../../services/api';
 import './Map.css';
 
 const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
   const [hoveredColony, setHoveredColony] = useState(null);
   const [travelingBee, setTravelingBee] = useState(null);
-  const [unlockedColonies, setUnlockedColonies] = useState({
-    honeycomb: true,
-    meadow: false,
-    sunset: false,
-    crystal: false,
-    forest: false,
-    ocean: false,
-  });
+  const [colonies, setColonies] = useState({});
+  const [mapLayout, setMapLayout] = useState({});
+  const [unlockedColonies, setUnlockedColonies] = useState({});
+  const [rankedTags, setRankedTags] = useState([]);
   const [currentUserId] = useState(sessionStorage.getItem('currentUserId'));
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [tooltipTimeout, setTooltipTimeout] = useState(null);
+
+  // Load user's personalized colony system
+  useEffect(() => {
+    const loadUserColonies = async () => {
+      if (!currentUserId) {
+        console.log('Map: No user ID found');
+        setLoading(false);
+        return;
+      }
+
+      setMapLoading(true);
+      try {
+        console.log('Map: Loading personalized colonies for user:', currentUserId);
+        const colonyData = await getUserColonies(currentUserId);
+
+        if (colonyData) {
+          setColonies(colonyData.colonies);
+          setMapLayout(colonyData.mapLayout);
+          setRankedTags(colonyData.rankedTags);
+
+          // Initialize unlocked colonies - start with top colony and 3 nearest
+          const initialUnlocked = {};
+          const startingColony = colonyData.startingColony;
+          initialUnlocked[startingColony] = true;
+
+          // Unlock 3 closest colonies based on ranking
+          const nearbyColonies = colonyData.rankedTags.slice(1, 4);
+          nearbyColonies.forEach((colony) => {
+            initialUnlocked[colony] = false; // Available to unlock
+          });
+
+          setUnlockedColonies(initialUnlocked);
+
+          // Set starting colony if not already set
+          if (!currentColony || !colonyData.colonies[currentColony]) {
+            onColonyChange(startingColony);
+          }
+
+          console.log('Map: Loaded colonies:', Object.keys(colonyData.colonies).length);
+          console.log('Map: Starting colony:', startingColony);
+        }
+      } catch (error) {
+        console.error('Map: Error loading user colonies:', error);
+      } finally {
+        setMapLoading(false);
+        setLoading(false);
+      }
+    };
+
+    loadUserColonies();
+  }, [currentUserId]);
 
   // Simple adjacency map for colonies
   const colonyConnections = {
@@ -49,40 +98,8 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     return null;
   };
 
-  // Load user's colony status on component mount
-  useEffect(() => {
-    const loadColonyStatus = async () => {
-      console.log('Map: Loading colony status for user:', currentUserId);
-
-      // For now, use simple logic - just unlock adjacent colonies
-      // You can enhance this to call your backend later
-      const getUnlockedColonies = () => {
-        const unlocked = { honeycomb: true }; // Always start with honeycomb
-
-        // Check if we have stored unlocked colonies
-        const stored = sessionStorage.getItem('unlockedColonies');
-        if (stored) {
-          try {
-            const storedUnlocked = JSON.parse(stored);
-            Object.assign(unlocked, storedUnlocked);
-          } catch (e) {
-            console.log('Error parsing stored colonies');
-          }
-        }
-
-        return unlocked;
-      };
-
-      const unlocked = getUnlockedColonies();
-      console.log('Map: Loaded unlocked colonies:', unlocked);
-      setUnlockedColonies(unlocked);
-    };
-
-    loadColonyStatus();
-  }, [currentUserId]);
-
   const handleColonyClick = async (colonyId) => {
-    if (loading) return;
+    if (loading || mapLoading) return;
 
     const colony = colonies[colonyId];
     if (!isColonyAccessible(colonyId)) {
@@ -90,12 +107,7 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
       return;
     }
 
-    console.log(
-      'Map: Handling colony click:',
-      colonyId,
-      'unlocked?',
-      unlockedColonies[colonyId]
-    );
+    console.log('Map: Handling colony click:', colonyId, 'unlocked?', unlockedColonies[colonyId]);
 
     if (unlockedColonies[colonyId]) {
       // Already unlocked, just travel there
@@ -105,18 +117,22 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
       }
     } else if (honey >= colony.cost) {
       // Can afford to unlock
-      setLoading(true);
+      setMapLoading(true);
       try {
-        console.log(
-          'Map: Unlocking colony:',
-          colonyId,
-          'for',
-          colony.cost,
-          'honey'
-        );
+        console.log('Map: Unlocking colony:', colonyId, 'for', colony.cost, 'honey');
 
         // Unlock the colony
         const newUnlocked = { ...unlockedColonies, [colonyId]: true };
+
+        // Unlock next accessible colonies (next 3 in ranking after this one)
+        const currentIndex = rankedTags.indexOf(colonyId);
+        const nextColonies = rankedTags.slice(currentIndex + 1, currentIndex + 4);
+        nextColonies.forEach((nextColony) => {
+          if (!newUnlocked[nextColony]) {
+            newUnlocked[nextColony] = false; // Make available to unlock
+          }
+        });
+
         setUnlockedColonies(newUnlocked);
 
         // Store in session storage
@@ -135,21 +151,16 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
         console.error('Error unlocking colony:', error);
         alert('Failed to unlock colony. Please try again.');
       } finally {
-        setLoading(false);
+        setMapLoading(false);
       }
     } else {
-      alert(
-        `You need ${colony.cost} honey to unlock ${colony.name}. You have ${honey} honey.`
-      );
+      alert(`You need ${colony.cost} honey to unlock ${colony.name}. You have ${honey} honey.`);
     }
   };
 
   const isColonyAccessible = (colonyId) => {
-    if (unlockedColonies[colonyId]) return true;
-
-    // Check if any connected colony is unlocked
-    const connections = colonyConnections[colonyId] || [];
-    return connections.some((connectedId) => unlockedColonies[connectedId]);
+    // Colony is accessible if it's unlocked or available to unlock
+    return unlockedColonies.hasOwnProperty(colonyId);
   };
 
   // 🔹 Animate bee step by step along path
@@ -189,10 +200,56 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
     };
   };
 
+  const handleMouseEnter = (colonyId) => {
+    if (tooltipTimeout) {
+      clearTimeout(tooltipTimeout);
+      setTooltipTimeout(null);
+    }
+    setHoveredColony(colonyId);
+  };
+
+  const handleMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setHoveredColony(null);
+    }, 150);
+    setTooltipTimeout(timeout);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+      }
+    };
+  }, [tooltipTimeout]);
+
+  if (loading) {
+    return (
+      <div className="map-container">
+        <div className="loading">
+          <div className="loading-icon">🐝</div>
+          <p>Generating your personalized colony map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (Object.keys(colonies).length === 0) {
+    return (
+      <div className="map-container">
+        <div className="loading">
+          <div className="loading-icon">❌</div>
+          <p>Unable to load your personalized colonies. Please ensure you have completed your profile.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="map-container">
       <div className="map-header">
-        <h2 className="map-title">🗺️ Colony Explorer</h2>
+        <h2 className="map-title">🗺️ Your Personal Colony Map</h2>
         <div className="honey-display">
           <span className="honey-icon">🍯</span>
           <span className="honey-amount">{honey}</span>
@@ -221,48 +278,37 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                 opacity="0.6"
               />
             </pattern>
-            <pattern
-              id="hexPatternDense"
-              patternUnits="userSpaceOnUse"
-              width="4"
-              height="4"
-            >
-              <polygon
-                points="2,0.3 3.3,1 3.3,3 2,3.7 0.7,3 0.7,1"
-                fill="none"
-                stroke="#f39c12"
-                strokeWidth="0.15"
-                opacity="0.4"
-              />
-            </pattern>
           </defs>
 
           <rect width="100" height="100" fill="url(#hexPattern)" />
-          <rect width="100" height="100" fill="url(#hexPatternDense)" opacity="0.7" />
 
-          {/* Roads */}
+          {/* Roads between connected colonies */}
           {Object.entries(mapLayout).map(([colonyId, data]) =>
-            data.connections.map((connectedId) => (
-              <line
-                key={`${colonyId}-${connectedId}`}
-                x1={data.x}
-                y1={data.y}
-                x2={mapLayout[connectedId].x}
-                y2={mapLayout[connectedId].y}
-                className={`road ${
-                  unlockedColonies[colonyId] && unlockedColonies[connectedId]
-                    ? 'road-unlocked'
-                    : 'road-locked'
-                }`}
-                strokeWidth="1.2"
-              />
-            ))
+            data.connections?.map((connectedId) =>
+              mapLayout[connectedId] && (
+                <line
+                  key={`${colonyId}-${connectedId}`}
+                  x1={data.x}
+                  y1={data.y}
+                  x2={mapLayout[connectedId].x}
+                  y2={mapLayout[connectedId].y}
+                  className={`road ${
+                    unlockedColonies[colonyId] && unlockedColonies[connectedId]
+                      ? 'road-unlocked'
+                      : 'road-locked'
+                  }`}
+                  strokeWidth="1.2"
+                />
+              )
+            )
           )}
 
           {/* Colonies */}
           {Object.entries(colonies).map(([colonyId, colony]) => {
             const position = mapLayout[colonyId];
-            const isUnlocked = unlockedColonies[colonyId];
+            if (!position) return null;
+
+            const isUnlocked = unlockedColonies[colonyId] === true;
             const isCurrent = colonyId === currentColony;
             const isAccessible = isColonyAccessible(colonyId);
 
@@ -285,9 +331,12 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                       : 'colony-inaccessible'
                   }`}
                   onClick={() => isAccessible && handleColonyClick(colonyId)}
-                  onMouseEnter={() => setHoveredColony(colonyId)}
-                  onMouseLeave={() => setHoveredColony(null)}
-                  style={{ fill: isUnlocked ? colony.color : '#8b7355' }}
+                  onMouseEnter={() => handleMouseEnter(colonyId)}
+                  onMouseLeave={handleMouseLeave}
+                  style={{ 
+                    fill: isUnlocked ? colony.color : '#8b7355',
+                    transition: 'all 0.3s ease'
+                  }}
                 />
 
                 <text
@@ -295,8 +344,22 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                   y={position.y - 7}
                   className="colony-label"
                   textAnchor="middle"
+                  style={{ 
+                    pointerEvents: 'none',
+                    transition: 'transform 0.3s ease',
+                    transform: hoveredColony === colonyId ? 'scale(1.2)' : 'scale(1)'
+                  }}
                 >
-                  {colony.name}
+                  {colony.icon}
+                </text>
+
+                <text
+                  x={position.x}
+                  y={position.y - 2}
+                  className="colony-name-small"
+                  textAnchor="middle"
+                >
+                  {colony.name.split(' ')[0]}
                 </text>
 
                 {!isUnlocked && isAccessible && (
@@ -327,10 +390,16 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
         </svg>
 
         {/* Tooltip */}
-        {hoveredColony && (
-          <div className="colony-tooltip">
-            <h4>{colonies[hoveredColony].name}</h4>
-            {unlockedColonies[hoveredColony] ? (
+        {hoveredColony && colonies[hoveredColony] && (
+          <div 
+            className="colony-tooltip"
+            style={{ pointerEvents: 'none' }}
+            onMouseEnter={() => handleMouseEnter(hoveredColony)}
+          >
+            <h4>
+              {colonies[hoveredColony].icon} {colonies[hoveredColony].name}
+            </h4>
+            {unlockedColonies[hoveredColony] === true ? (
               <p>Click to travel</p>
             ) : isColonyAccessible(hoveredColony) ? (
               <div>
@@ -342,15 +411,22 @@ const Map = ({ currentColony, honey, onColonyChange, onHoneyChange }) => {
                 </p>
               </div>
             ) : (
-              <p>Unlock adjacent colonies first</p>
+              <p>Explore more colonies to unlock</p>
             )}
           </div>
         )}
       </div>
 
       <div className="current-colony-info">
-        <h3>Currently in: {colonies[currentColony].name}</h3>
-        <p>Explore this colony to meet new people!</p>
+        <h3>
+          Currently in: {colonies[currentColony]?.icon} {colonies[currentColony]?.name}
+        </h3>
+        <p>Find people who share your interests in {colonies[currentColony]?.name}!</p>
+        <div className="colony-rank">
+          <p>
+            Your affinity rank: #{(rankedTags.indexOf(currentColony) + 1) || '?'} of {rankedTags.length}
+          </p>
+        </div>
       </div>
     </div>
   );

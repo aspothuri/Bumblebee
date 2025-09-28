@@ -1,345 +1,213 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000';
-
-// Create axios instance with base configuration
-const api = axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-
-// Colony definitions (moved from data.js)
-export const colonies = {
-    honeycomb: { name: "Honeycomb Heights", color: "#ffc107", unlocked: true, cost: 0 },
-    meadow: { name: "Meadow Fields", color: "#4caf50", unlocked: false, cost: 15 },
-    sunset: { name: "Sunset Valley", color: "#ff9800", unlocked: false, cost: 20 },
-    crystal: { name: "Crystal Gardens", color: "#2196f3", unlocked: false, cost: 25 },
-    forest: { name: "Whispering Woods", color: "#795548", unlocked: false, cost: 30 },
-    ocean: { name: "Ocean Breeze", color: "#00bcd4", unlocked: false, cost: 35 }
+// Tag-based colonies mapping
+export const tagColonies = {
+  adventure: { name: "Adventure Peak", color: "#ff6b35", icon: "🏔️" },
+  creativity: { name: "Creative Commons", color: "#9b59b6", icon: "🎨" },
+  fitness: { name: "Fitness Fields", color: "#e74c3c", icon: "💪" },
+  technology: { name: "Tech Hub", color: "#3498db", icon: "💻" },
+  foodCooking: { name: "Culinary Corner", color: "#f39c12", icon: "🍳" },
+  reading: { name: "Literature Library", color: "#8b4513", icon: "📚" },
+  moviesTV: { name: "Cinema City", color: "#2c3e50", icon: "🎬" },
+  music: { name: "Harmony Heights", color: "#e67e22", icon: "🎵" },
+  travel: { name: "Wanderer's Way", color: "#16a085", icon: "✈️" },
+  socializing: { name: "Social Square", color: "#f1c40f", icon: "🎉" },
+  quietNightsIn: { name: "Cozy Cottage", color: "#95a5a6", icon: "🏠" },
+  hiking: { name: "Trail Town", color: "#27ae60", icon: "🥾" },
+  gaming: { name: "Gamer's Grove", color: "#9013fe", icon: "🎮" },
+  sports: { name: "Athletic Arena", color: "#ff4757", icon: "⚽" },
+  comedy: { name: "Laughter Lane", color: "#ffa502", icon: "😂" },
+  artMuseums: { name: "Gallery Gardens", color: "#6c5ce7", icon: "🖼️" },
+  politics: { name: "Debate District", color: "#636e72", icon: "🏛️" },
+  science: { name: "Research Ridge", color: "#00b894", icon: "🔬" },
+  spirituality: { name: "Zen Zone", color: "#fd79a8", icon: "🧘" },
+  pets: { name: "Pet Paradise", color: "#fdcb6e", icon: "🐕" },
+  fashion: { name: "Style Street", color: "#e84393", icon: "👗" },
+  diyCrafts: { name: "Maker's Mill", color: "#a29bfe", icon: "🔨" },
+  volunteering: { name: "Helper's Haven", color: "#81ecec", icon: "🤝" },
+  boardGames: { name: "Game Guild", color: "#fab1a0", icon: "🎲" },
+  history: { name: "Heritage Hill", color: "#6c5ce7", icon: "🏺" },
+  sustainability: { name: "Green Grove", color: "#00b894", icon: "♻️" },
+  liveEvents: { name: "Event Plaza", color: "#ff7675", icon: "🎪" },
+  personalGrowth: { name: "Growth Garden", color: "#74b9ff", icon: "🌱" },
+  photography: { name: "Shutter Studios", color: "#fd79a8", icon: "📸" },
+  gardening: { name: "Bloom Borough", color: "#55a3ff", icon: "🌻" }
 };
 
-// Map layout - colony positions and connections
-export const mapLayout = {
-    honeycomb: { x: 50, y: 50, connections: ['meadow', 'sunset'] },
-    meadow: { x: 20, y: 30, connections: ['honeycomb', 'forest'] },
-    sunset: { x: 80, y: 30, connections: ['honeycomb', 'crystal'] },
-    crystal: { x: 80, y: 70, connections: ['sunset', 'ocean'] },
-    forest: { x: 20, y: 70, connections: ['meadow', 'ocean'] },
-    ocean: { x: 50, y: 90, connections: ['forest', 'crystal'] }
-};
-
-// User API functions
-export const userAPI = {
-    // Login user
-    login: async (username, password) => {
-        try {
-            const response = await api.get('/users', {
-                params: { search: username, passwordSearch: password, fullObject: true }
-            });
-
-            if (response.data && response.data.length > 0) {
-                const user = response.data[0];
-                return { success: true, user };
-            }
-            return { success: false, message: 'Invalid credentials' };
-        } catch (error) {
-            console.error('Login error:', error);
-            return { success: false, message: 'Login failed' };
-        }
-    },
-
-    // Register new user
-    register: async (username, password) => {
-        try {
-            const response = await api.post('/users', { username, password });
-            return { success: true, user: response.data };
-        } catch (error) {
-            console.error('Registration error:', error);
-            return { success: false, message: error.response?.data?.message || 'Registration failed' };
-        }
-    },
-
-    // Get user by ID
-    getUser: async (userId) => {
-        try {
-            const response = await api.get('/users', {
-                params: { searchUserId: userId, fullObject: true }
-            });
-            return response.data[0] || null;
-        } catch (error) {
-            console.error('Get user error:', error);
-            return null;
-        }
+// Get colony assignment for a user based on their database tags
+export const getUserColonyFromTags = async (userId) => {
+  try {
+    console.log('API: Getting user colony from database tags for:', userId);
+    const response = await axios.get('http://localhost:3000/tags');
+    
+    const userTagData = response.data.find(tagArray => tagArray[0] === userId);
+    if (!userTagData) {
+      console.log('API: No tags found for user, returning default colony');
+      return 'adventure'; // Default colony
     }
-};
-
-// Profile API functions
-export const profileAPI = {
-    // Get all profiles or filter by user
-    getProfiles: async (userId = null) => {
-        try {
-            const params = userId ? { searchUserId: userId } : {};
-            const response = await api.get('/profiles', { params });
-            return response.data;
-        } catch (error) {
-            console.error('Get profiles error:', error);
-            return [];
-        }
-    },
-
-    // Create or update profile
-    createProfile: async (userId, profileData) => {
-        try {
-            const response = await api.post(`/profiles/${userId}`, profileData);
-            return { success: true, profile: response.data };
-        } catch (error) {
-            console.error('Create profile error:', error);
-            return { success: false, message: error.response?.data?.message || 'Profile creation failed' };
-        }
-    },
-
-    // Get compatible users
-    getCompatibleUsers: async (userId) => {
-        try {
-            const response = await api.get(`/profiles/${userId}/compatibility`);
-            return response.data;
-        } catch (error) {
-            console.error('Get compatible users error:', error);
-            return [];
-        }
+    
+    // Convert array to object with tag names
+    const tagKeys = [
+      'adventure', 'creativity', 'fitness', 'technology', 'foodCooking', 'reading', 'moviesTV',
+      'music', 'travel', 'socializing', 'quietNightsIn', 'hiking', 'gaming', 'sports', 'comedy',
+      'artMuseums', 'politics', 'science', 'spirituality', 'pets', 'fashion', 'diyCrafts',
+      'volunteering', 'boardGames', 'history', 'sustainability', 'liveEvents', 'personalGrowth',
+      'photography', 'gardening'
+    ];
+    
+    const userTags = {};
+    tagKeys.forEach((key, index) => {
+      userTags[key] = userTagData[index + 1] || 1;
+    });
+    
+    // Find highest scoring tag as primary colony
+    let highestTag = 'adventure';
+    let highestScore = 0;
+    
+    for (const [tag, score] of Object.entries(userTags)) {
+      if (score > highestScore) {
+        highestScore = score;
+        highestTag = tag;
+      }
     }
+    
+    console.log('API: User primary colony based on tags:', highestTag, 'with score:', highestScore);
+    return highestTag;
+    
+  } catch (error) {
+    console.error('API: Error fetching user tags for colony assignment:', error);
+    return 'adventure'; // Default fallback
+  }
 };
 
-// Tags API functions
-export const tagsAPI = {
-    // Get all tags
-    getTags: async () => {
-        try {
-            const response = await api.get('/tags');
-            return response.data;
-        } catch (error) {
-            console.error('Get tags error:', error);
-            return [];
-        }
-    },
+// Generate map layout based on user's tag rankings
+export const generateMapLayout = (userTags, userTagRankings) => {
+  const layout = {};
+  const positions = generatePositions(userTagRankings);
+  
+  userTagRankings.forEach((tag, index) => {
+    layout[tag] = {
+      x: positions[index].x,
+      y: positions[index].y,
+      connections: getConnections(tag, userTagRankings, index)
+    };
+  });
+  
+  return layout;
+};
 
-    // Create or update tags for user
-    createTags: async (userId, tagsData) => {
-        try {
-            const response = await api.post(`/tags/${userId}`, tagsData);
-            return { success: true, tags: response.data };
-        } catch (error) {
-            console.error('Create tags error:', error);
-            return { success: false, message: error.response?.data?.message || 'Tags creation failed' };
-        }
+// Generate positions in a circular/spiral pattern based on rankings
+const generatePositions = (rankings) => {
+  const positions = [];
+  const centerX = 50, centerY = 50;
+  
+  // Put highest ranked tag at center
+  positions.push({ x: centerX, y: centerY });
+  
+  // Arrange others in concentric circles
+  let radius = 15;
+  let angle = 0;
+  const angleStep = (2 * Math.PI) / Math.min(6, rankings.length - 1);
+  
+  for (let i = 1; i < rankings.length; i++) {
+    if (i === 7) { // Start new ring
+      radius = 30;
+      angle = 0;
+    } else if (i === 13) {
+      radius = 45;
+      angle = 0;
     }
+    
+    const x = centerX + radius * Math.cos(angle);
+    const y = centerY + radius * Math.sin(angle);
+    
+    positions.push({ x, y });
+    angle += angleStep;
+  }
+  
+  return positions;
 };
 
-// Matches API functions
-export const matchesAPI = {
-    // Get matches for user
-    getMatches: async (userId) => {
-        try {
-            const response = await api.get(`/matches/${userId}`);
-            return response.data;
-        } catch (error) {
-            console.error('Get matches error:', error);
-            return [];
-        }
-    },
-
-    // Create a new match
-    createMatch: async (user1Id, user2Id) => {
-        try {
-            const response = await api.post('/matches', {
-                user1Id,
-                user2Id,
-                matchedAt: new Date()
-            });
-            return { success: true, match: response.data };
-        } catch (error) {
-            console.error('Create match error:', error);
-            return { success: false, message: error.response?.data?.message || 'Match creation failed' };
-        }
-    },
-
-    // Remove a match
-    removeMatch: async (matchId) => {
-        try {
-            const response = await api.delete(`/matches/${matchId}`);
-            return { success: true, match: response.data };
-        } catch (error) {
-            console.error('Remove match error:', error);
-            return { success: false, message: error.response?.data?.message || 'Match removal failed' };
-        }
+// Get connections for a colony (only to nearby colonies in ranking)
+const getConnections = (tag, rankings, index) => {
+  const connections = [];
+  const maxConnections = 3;
+  
+  // Connect to nearby ranked colonies
+  for (let i = Math.max(0, index - 2); i <= Math.min(rankings.length - 1, index + 2); i++) {
+    if (i !== index && connections.length < maxConnections) {
+      connections.push(rankings[i]);
     }
+  }
+  
+  return connections;
 };
 
-// Chat API functions
-export const chatAPI = {
-    // Get chat between two users
-    getChat: async (user1Id, user2Id) => {
-        try {
-            const response = await api.get('/chat', {
-                params: { user1Id, user2Id }
-            });
-            return response.data;
-        } catch (error) {
-            if (error.response?.status === 404) {
-                return null; // Chat doesn't exist
-            }
-            console.error('Get chat error:', error);
-            return null;
-        }
-    },
-
-    // Create new chat
-    createChat: async (user1Id, user2Id) => {
-        try {
-            const response = await api.post('/chat', { user1Id, user2Id });
-            return { success: true, chat: response.data };
-        } catch (error) {
-            console.error('Create chat error:', error);
-            return { success: false, message: error.response?.data?.message || 'Chat creation failed' };
-        }
-    },
-
-    // Send message
-    sendMessage: async (chatId, senderId, content) => {
-        try {
-            const response = await api.put(`/chat/${chatId}/message`, {
-                senderId,
-                content
-            });
-            return { success: true, chat: response.data };
-        } catch (error) {
-            console.error('Send message error:', error);
-            return { success: false, message: error.response?.data?.message || 'Message sending failed' };
-        }
+// Fetch user's tags and generate their personalized colonies
+export const getUserColonies = async (userId) => {
+  try {
+    console.log('API: Fetching user tags for:', userId);
+    const response = await axios.get('http://localhost:3000/tags');
+    
+    const userTagData = response.data.find(tagArray => tagArray[0] === userId);
+    if (!userTagData) {
+      throw new Error('User tags not found');
     }
+    
+    // Convert array to object with tag names
+    const tagKeys = [
+      'adventure', 'creativity', 'fitness', 'technology', 'foodCooking', 'reading', 'moviesTV',
+      'music', 'travel', 'socializing', 'quietNightsIn', 'hiking', 'gaming', 'sports', 'comedy',
+      'artMuseums', 'politics', 'science', 'spirituality', 'pets', 'fashion', 'diyCrafts',
+      'volunteering', 'boardGames', 'history', 'sustainability', 'liveEvents', 'personalGrowth',
+      'photography', 'gardening'
+    ];
+    
+    const userTags = {};
+    tagKeys.forEach((key, index) => {
+      userTags[key] = userTagData[index + 1] || 1;
+    });
+    
+    // Rank tags by score (highest first)
+    const rankedTags = tagKeys
+      .map(tag => ({ tag, score: userTags[tag] }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20) // Take top 20 tags
+      .map(item => item.tag);
+    
+    console.log('API: User tag rankings:', rankedTags);
+    
+    // Generate colonies object
+    const colonies = {};
+    rankedTags.forEach(tag => {
+      colonies[tag] = {
+        ...tagColonies[tag],
+        cost: Math.max(0, 10 + (rankedTags.indexOf(tag) * 5)) // Closer colonies cost less
+      };
+    });
+    
+    // Generate map layout
+    const mapLayout = generateMapLayout(userTags, rankedTags);
+    
+    return {
+      colonies,
+      mapLayout,
+      startingColony: rankedTags[0], // Start at highest ranked tag
+      userTags,
+      rankedTags
+    };
+    
+  } catch (error) {
+    console.error('Error fetching user colonies:', error);
+    // Fallback to default system
+    return null;
+  }
 };
 
-// Colony API functions
+// Legacy exports for compatibility
+export const colonies = tagColonies;
+export const mapLayout = {};
 export const colonyAPI = {
-    // Get all colonies
-    getColonies: async () => {
-        try {
-            const response = await api.get('/colonies');
-            return response.data;
-        } catch (error) {
-            console.error('Get colonies error:', error);
-            return colonies; // Fallback to local data
-        }
-    },
-
-    // Get user's colony status
-    getUserColonyStatus: async (userId) => {
-        try {
-            const response = await api.get(`/colonies/${userId}`);
-            return response.data;
-        } catch (error) {
-            console.error('Get user colony status error:', error);
-            return null;
-        }
-    },
-
-    // Change user's current colony
-    changeColony: async (userId, colonyId) => {
-        try {
-            const response = await api.post(`/colonies/${userId}/change`, { colonyId });
-            return { success: true, data: response.data };
-        } catch (error) {
-            console.error('Change colony error:', error);
-            return { success: false, message: error.response?.data?.message || 'Colony change failed' };
-        }
-    },
-
-    // Unlock a new colony
-    unlockColony: async (userId, colonyId) => {
-        try {
-            const response = await api.post(`/colonies/${userId}/unlock`, { colonyId });
-            return { success: true, data: response.data };
-        } catch (error) {
-            console.error('Unlock colony error:', error);
-            return { success: false, message: error.response?.data?.message || 'Colony unlock failed' };
-        }
-    },
-
-    // Add honey to user
-    addHoney: async (userId, amount) => {
-        try {
-            const response = await api.post(`/colonies/${userId}/honey`, { amount });
-            return { success: true, data: response.data };
-        } catch (error) {
-            console.error('Add honey error:', error);
-            return { success: false, message: error.response?.data?.message || 'Add honey failed' };
-        }
-    }
+  getUserColonies,
+  getUserColonyFromTags
 };
-
-// Utility functions
-export const utils = {
-    // Convert profile data from backend format to frontend format
-    formatProfile: (profileData, userId, username = 'User') => {
-        if (!profileData || profileData.length < 4) {
-            return null;
-        }
-
-        return {
-            id: userId,
-            name: username,
-            age: profileData[2] || 25,
-            bio: profileData[3] || 'Looking for meaningful connections!',
-            location: 'City, State', // Would need to be added to backend
-            colony: 'honeycomb', // Default colony
-            photos: [profileData[1] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face'],
-            occupation: 'Professional', // Would need to be added to backend
-            education: 'University', // Would need to be added to backend
-            height: '5\'10"', // Would need to be added to backend
-            interests: ['Technology', 'Music', 'Travel'] // Would need to be added to backend
-        };
-    },
-
-    // Get current user from localStorage
-    getCurrentUser: () => {
-        return {
-            id: localStorage.getItem('currentUserId'),
-            username: localStorage.getItem('currentUserEmail'),
-            name: localStorage.getItem('userName'),
-            age: localStorage.getItem('userAge'),
-            location: localStorage.getItem('userLocation'),
-            description: localStorage.getItem('userDescription'),
-            interests: localStorage.getItem('userInterests'),
-            profilePicture: localStorage.getItem('userProfilePicture')
-        };
-    },
-
-    // Set current user in localStorage
-    setCurrentUser: (userData) => {
-        if (userData.id) localStorage.setItem('currentUserId', userData.id);
-        if (userData.username) localStorage.setItem('currentUserEmail', userData.username);
-        if (userData.name) localStorage.setItem('userName', userData.name);
-        if (userData.age) localStorage.setItem('userAge', userData.age);
-        if (userData.location) localStorage.setItem('userLocation', userData.location);
-        if (userData.description) localStorage.setItem('userDescription', userData.description);
-        if (userData.interests) localStorage.setItem('userInterests', userData.interests);
-        if (userData.profilePicture) localStorage.setItem('userProfilePicture', userData.profilePicture);
-    },
-
-    // Clear current user from localStorage
-    clearCurrentUser: () => {
-        localStorage.removeItem('currentUserId');
-        localStorage.removeItem('currentUserEmail');
-        localStorage.removeItem('userName');
-        localStorage.removeItem('userAge');
-        localStorage.removeItem('userLocation');
-        localStorage.removeItem('userDescription');
-        localStorage.removeItem('userInterests');
-        localStorage.removeItem('userProfilePicture');
-        localStorage.removeItem('savedMatches');
-    }
-};
-
-export default api;
